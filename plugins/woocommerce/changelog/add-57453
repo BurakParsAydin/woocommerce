@@ -1,0 +1,4 @@
+Significance: minor
+Type: add
+
+Introduced a test to ensure no redirect occurs when both [woocommerce_cart] and [woocommerce_checkout] shortcodes are rendered together.

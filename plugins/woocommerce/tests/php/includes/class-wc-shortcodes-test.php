@@ -476,4 +476,30 @@ class WC_Shortcodes_Test extends WC_Unit_Test_Case {
 
 		$this->assertStringContainsString( 'This content is password protected', $product_page );
 	}
+
+	/**
+	 * Ensure that when both [woocommerce_cart] and [woocommerce_checkout] shortcodes
+	 * are rendered together, no redirect to the cart page occurs.
+	 */
+	public function test_combined_cart_and_checkout_shortcodes_do_not_redirect() {
+		// Simulate being on the cart page (as if [woocommerce_cart] is present).
+		add_filter( 'woocommerce_is_cart', '__return_true' );
+
+		// Track if a redirect is triggered.
+		$redirect_url = null;
+		add_filter( 'wp_redirect', function ( $location ) use ( &$redirect_url ) {
+			$redirect_url = $location;
+			return $location;
+		}, 10 );
+
+		// Suppress output and simulate shortcode rendering.
+		ob_start();
+		echo do_shortcode( '[woocommerce_cart][woocommerce_checkout]' );
+		ob_end_clean();
+
+		remove_filter( 'woocommerce_is_cart', '__return_true' );
+
+		// Confirm no redirect occurred.
+		$this->assertNull( $redirect_url, 'Expected no redirect when both shortcodes are rendered together.' );
+	}
 }

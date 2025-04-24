@@ -129,16 +129,40 @@ class ShippingController {
 		$details         = $shipping_method->get_meta( 'pickup_details' );
 		$location        = $shipping_method->get_meta( 'pickup_location' );
 		$address         = $shipping_method->get_meta( 'pickup_address' );
+		$cost            = $shipping_method->get_total();
 
-		if ( ! $address ) {
+		$section = '';
+
+		if ( $location ) {
+			$section .= sprintf(
+				// Translators: %s location name.
+				__( 'Collection from <strong>%s</strong>:', 'woocommerce' ),
+				$location
+			);
+		}
+
+		if ( $address ) {
+			$section .= '<br/><address>' . nl2br( esc_html( str_replace( ',', ', ', $address ) ) ) . '</address>';
+		}
+
+		if ( $details ) {
+			$section .= '<br/>' . wp_kses_post( $details );
+		}
+
+		if ( $cost > 0 ) {
+			$section .= '<br/>' . sprintf(
+				// Translators: %s is the formatted price.
+				__( 'Pickup cost: %s', 'woocommerce' ),
+				wc_price( $cost, array( 'currency' => $order->get_currency() ) )
+			);
+		}
+
+		// If nothing is available, return original.
+		if ( empty( $section ) ) {
 			return $return_value;
 		}
 
-		return sprintf(
-			// Translators: %s location name.
-			__( 'Collection from <strong>%s</strong>:', 'woocommerce' ),
-			$location
-		) . '<br/><address>' . str_replace( ',', ',<br/>', $address ) . '</address><br/>' . $details;
+		return $section;
 	}
 
 	/**

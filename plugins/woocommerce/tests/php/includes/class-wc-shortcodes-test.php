@@ -478,28 +478,40 @@ class WC_Shortcodes_Test extends WC_Unit_Test_Case {
 	}
 
 	/**
+	 * Helper method to track redirects.
+	 *
+	 * @param string $location The redirect location.
+	 * @return string The unchanged redirect location.
+	 */
+	public function track_redirect( $location ) {
+		$this->redirect_url = $location;
+		return $location;
+	}
+
+	/**
 	 * Ensure that when both [woocommerce_cart] and [woocommerce_checkout] shortcodes
 	 * are rendered together, no redirect to the cart page occurs.
 	 */
 	public function test_combined_cart_and_checkout_shortcodes_do_not_redirect() {
+		// Initialize redirect tracker.
+		$this->redirect_url = null;
+
 		// Simulate being on the cart page (as if [woocommerce_cart] is present).
 		add_filter( 'woocommerce_is_cart', '__return_true' );
 
 		// Track if a redirect is triggered.
-		$redirect_url = null;
-		add_filter( 'wp_redirect', function ( $location ) use ( &$redirect_url ) {
-			$redirect_url = $location;
-			return $location;
-		}, 10 );
+		add_filter( 'wp_redirect', array( $this, 'track_redirect' ), 10, 1 );
 
 		// Suppress output and simulate shortcode rendering.
 		ob_start();
 		echo do_shortcode( '[woocommerce_cart][woocommerce_checkout]' );
 		ob_end_clean();
 
+		// Remove filters.
 		remove_filter( 'woocommerce_is_cart', '__return_true' );
+		remove_filter( 'wp_redirect', array( $this, 'track_redirect' ), 10 );
 
 		// Confirm no redirect occurred.
-		$this->assertNull( $redirect_url, 'Expected no redirect when both shortcodes are rendered together.' );
+		$this->assertNull( $this->redirect_url, 'Expected no redirect when both shortcodes are rendered together.' );
 	}
 }

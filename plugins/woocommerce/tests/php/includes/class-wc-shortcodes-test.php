@@ -26,6 +26,13 @@ class WC_Shortcodes_Test extends WC_Unit_Test_Case {
 	protected static $user_contributor;
 
 	/**
+	 * The redirect URL used in tests.
+	 *
+	 * @var string
+	 */
+	protected static $redirect_url;
+
+	/**
 	 * Setup once before running tests.
 	 *
 	 * @param object $factory Factory object.

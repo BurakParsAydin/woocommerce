@@ -142,7 +142,7 @@ class ShippingController {
 		}
 
 		if ( $address ) {
-			$lines[] = '<address>' . nl2br( esc_html( str_replace( ',', ', ', $address ) ) );
+			$lines[] = nl2br( esc_html( str_replace( ',', ', ', $address ) ) );
 		}
 
 		if ( $details ) {
@@ -150,7 +150,7 @@ class ShippingController {
 		}
 
 		if ( $cost > 0 ) {
-			$lines[] = sprintf(
+			$lines[] = '<br>' . sprintf(
 				// Translators: %s is the formatted price.
 				__( 'Pickup cost: %s', 'woocommerce' ),
 				wc_price( $cost, array( 'currency' => $order->get_currency() ) )
@@ -163,7 +163,7 @@ class ShippingController {
 		}
 
 		// Join all the lines with a <br> separator.
-		return implode( '<br/>', $lines );
+		return implode( '<br>', $lines );
 	}
 
 	/**

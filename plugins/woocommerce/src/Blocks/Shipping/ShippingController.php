@@ -131,10 +131,10 @@ class ShippingController {
 		$address         = $shipping_method->get_meta( 'pickup_address' );
 		$cost            = $shipping_method->get_total();
 
-		$section = '';
+		$lines = array();
 
 		if ( $location ) {
-			$section .= sprintf(
+			$lines[] = sprintf(
 				// Translators: %s location name.
 				__( 'Collection from <strong>%s</strong>:', 'woocommerce' ),
 				$location
@@ -142,15 +142,15 @@ class ShippingController {
 		}
 
 		if ( $address ) {
-			$section .= '<br/><address>' . nl2br( esc_html( str_replace( ',', ', ', $address ) ) ) . '</address>';
+			$lines[] = '<address>' . nl2br( esc_html( str_replace( ',', ', ', $address ) ) );
 		}
 
 		if ( $details ) {
-			$section .= '<br/>' . wp_kses_post( $details );
+			$lines[] = wp_kses_post( $details );
 		}
 
 		if ( $cost > 0 ) {
-			$section .= '<br/>' . sprintf(
+			$lines[] = sprintf(
 				// Translators: %s is the formatted price.
 				__( 'Pickup cost: %s', 'woocommerce' ),
 				wc_price( $cost, array( 'currency' => $order->get_currency() ) )
@@ -158,11 +158,12 @@ class ShippingController {
 		}
 
 		// If nothing is available, return original.
-		if ( empty( $section ) ) {
+		if ( empty( $lines ) ) {
 			return $return_value;
 		}
 
-		return $section;
+		// Join all the lines with a <br> separator.
+		return implode( '<br/>', $lines );
 	}
 
 	/**

@@ -153,11 +153,20 @@ class ShippingController {
 			$tax_display = get_option( 'woocommerce_tax_display_cart' );
 			$tax         = $shipping_method->get_total_tax();
 
-			// Format cost with tax handling
+			// Format cost with tax handling.
 			if ( 'excl' === $tax_display ) {
-				// Show pickup cost excluding tax
+				// Show pickup cost excluding tax.
 				$formatted_cost = wc_price( $cost, array( 'currency' => $order->get_currency() ) );
 				if ( (float) $tax > 0 && $order->get_prices_include_tax() ) {
+					/**
+					 * Hook to add tax label to pickup cost.
+					 *
+					 * @since 6.0.0
+					 * @param string $tax_label Tax label.
+					 * @param \WC_Order $order Order object.
+					 * @param string $tax_display Tax display.
+					 * @return string
+					 */
 					$formatted_cost .= apply_filters(
 						'woocommerce_order_shipping_to_display_tax_label',
 						'&nbsp;<small class="tax_label">' . WC()->countries->ex_tax_or_vat() . '</small>',
@@ -166,12 +175,21 @@ class ShippingController {
 					);
 				}
 			} else {
-				// Show pickup cost including tax
+				// Show pickup cost including tax.
 				$formatted_cost = wc_price(
 					(float) $cost + (float) $tax,
 					array( 'currency' => $order->get_currency() )
 				);
 				if ( (float) $tax > 0 && ! $order->get_prices_include_tax() ) {
+					/**
+					 * Hook to add tax label to pickup cost.
+					 *
+					 * @since 6.0.0
+					 * @param string $tax_label Tax label.
+					 * @param \WC_Order $order Order object.
+					 * @param string $tax_display Tax display.
+					 * @return string
+					 */
 					$formatted_cost .= apply_filters(
 						'woocommerce_order_shipping_to_display_tax_label',
 						'&nbsp;<small class="tax_label">' . WC()->countries->inc_tax_or_vat() . '</small>',

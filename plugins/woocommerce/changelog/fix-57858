@@ -1,0 +1,4 @@
+Significance: minor
+Type: fix
+
+Hide shipping warning when valid rates are available after switching from Local Pickup.

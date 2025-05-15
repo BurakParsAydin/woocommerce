@@ -38,10 +38,11 @@ export const useShowShippingTotalWarning = () => {
 				( notice: WPNotice ) => notice.id === errorNoticeId
 			);
 		const hasMismatch =
-			!prefersCollection &&
+			! prefersCollection &&
 			hasSelectedLocalPickup &&
 			shippingRates?.every(
-				(rate) => rate.method_id && rate.method_id.includes('local_pickup')
+				( rate ) =>
+					rate.method_id && rate.method_id.includes( 'local_pickup' )
 			);
 
 		if ( ! hasRates || isRateBeingSelected ) {

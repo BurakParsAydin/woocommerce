@@ -37,7 +37,12 @@ export const useShowShippingTotalWarning = () => {
 			shippingNotices.some(
 				( notice: WPNotice ) => notice.id === errorNoticeId
 			);
-		const hasMismatch = ! prefersCollection && hasSelectedLocalPickup;
+		const hasMismatch =
+			!prefersCollection &&
+			hasSelectedLocalPickup &&
+			shippingRates?.every(
+				(rate) => rate.method_id && rate.method_id.includes('local_pickup')
+			);
 
 		if ( ! hasRates || isRateBeingSelected ) {
 			// Early return because shipping rates were not yet loaded from the cart data store, or the user is changing

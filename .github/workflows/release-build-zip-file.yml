@@ -1,30 +1,30 @@
-name: 'Release: Build ZIP file'
+name: "Release: Build ZIP file"
 
 on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'By default the zip file is generated from the branch the workflow runs from, but you can specify an explicit reference to use instead here (e.g. refs/tags/tag_name or refs/heads/release/x.x). The resulting file will be available as an artifact on the workflow run.'
+        description: "By default the zip file is generated from the branch the workflow runs from, but you can specify an explicit reference to use instead here (e.g. refs/tags/tag_name or refs/heads/release/x.x). The resulting file will be available as an artifact on the workflow run."
         required: false
-        default: ''
+        default: ""
       skip_verify:
-        description: 'Skip the PR verification step (default: false) pass true to skip'
+        description: "Skip the PR verification step (default: false) pass true to skip"
         required: false
-        default: 'false'
+        default: "false"
       release_type:
-        description: 'Release type (e.g. stable, rc, beta)'
+        description: "Release type (e.g. stable, rc, beta)"
         required: false
-        default: ''
+        default: ""
       version:
-        description: 'Release version (e.g. 9.0.0)'
+        description: "Release version (e.g. 9.0.0)"
         required: false
-        default: ''
+        default: ""
 
 permissions: {}
 
 jobs:
   verify:
-    name: 'Verify if any PR is left open by author:app/github-actions'
+    name: "Verify if any PR is left open by author:app/github-actions"
     outputs:
       runBuildZipJob: ${{ steps.verify-prs.outputs.runBuildZipJob }}
     runs-on: ubuntu-latest
@@ -105,7 +105,7 @@ jobs:
       - name: Setup WooCommerce Monorepo
         uses: ./.github/actions/setup-woocommerce-monorepo
         with:
-          pull-package-deps: '@woocommerce/plugin-woocommerce'
+          pull-package-deps: "@woocommerce/plugin-woocommerce"
 
       - name: Build zip
         working-directory: plugins/woocommerce

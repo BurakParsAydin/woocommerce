@@ -1,0 +1,4 @@
+Significance: minor
+Type: dev
+
+Added a GitHub Actions workflow to streamline the stable release process. This workflow verifies version consistency, checks for open CFE/PRR issues, updates the 'stable' tag, and optionally sends a Slack notification.

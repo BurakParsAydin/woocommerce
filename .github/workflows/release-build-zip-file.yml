@@ -171,10 +171,11 @@ jobs:
         run: |
           if [ -n "$SLACK_WEBHOOK" ]; then
             curl -X POST -H 'Content-type: application/json' \
-              --data '{"text":"🚀 WooCommerce v10.0.0-dev has been marked as *stable*! 🎉"}' \
+              --data "{\"text\":\"🚀 WooCommerce v${VERSION} has been marked as *stable*! 🎉\"}" \
               "$SLACK_WEBHOOK"
           else
             echo "No Slack webhook set. Skipping notification."
           fi
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_RELEASE_WEBHOOK }}
+          VERSION: ${{ github.event.inputs.version }}

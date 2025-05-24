@@ -216,16 +216,29 @@ class OrderController {
 	protected function perform_custom_order_validation( \WC_Order $order ) {
 		$validation_errors = new \WP_Error();
 
-		/**
-		 * Allow plugins to perform custom validation before payment.
-		 *
-		 * Plugins can add errors to the $validation_errors object.
-		 *
-		 * @param \WC_Order $order             The order object.
-		 * @param \WP_Error $validation_errors WP_Error object to add custom errors to.
-		 * @since 9.9.0
-		 */
-		do_action( 'woocommerce_checkout_validate_order_before_payment', $order, $validation_errors );
+		try {
+			/**
+			 * Allow plugins to perform custom validation before payment.
+			 *
+			 * Plugins can add errors to the $validation_errors object.
+			 *
+			 * @param \WC_Order $order             The order object.
+			 * @param \WP_Error $validation_errors WP_Error object to add custom errors to.
+			 * @since 9.9.0
+			 */
+			do_action( 'woocommerce_checkout_validate_order_before_payment', $order, $validation_errors );
+		} catch ( \Throwable $e ) {
+			// Log the error, but allow the checkout to proceed.
+			wc_get_logger()->error(
+				sprintf(
+					'Error in checkout validation hook: %s in %s on line %d',
+					$e->getMessage(),
+					$e->getFile(),
+					$e->getLine()
+				),
+				[ 'source' => 'checkout-validation' ]
+			);
+		}
 
 		// Check if there are any errors after custom validation.
 		if ( $validation_errors->has_errors() ) {

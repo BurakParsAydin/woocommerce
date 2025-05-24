@@ -1,0 +1,4 @@
+Significance: minor
+Type: fix
+
+Prevent fatal errors caused by third-party callbacks during checkout validation by wrapping the 'woocommerce_checkout_validate_order_before_payment' action in error handling.

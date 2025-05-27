@@ -101,6 +101,8 @@ test( 'displays error notice when adding out-of-stock product from Product Colle
 	product,
 	pageSetup,
 } ) => {
+	expect( pageSetup ).toBeTruthy();
+	
 	await test.step( 'Go to the test page with Product Collection block', async () => {
 		await page.goto( '/product-collection-test' );
 		await expect( page.getByText( product.name ) ).toBeVisible();

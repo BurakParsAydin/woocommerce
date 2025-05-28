@@ -1041,13 +1041,13 @@ class WC_Product extends WC_Abstract_Legacy_Product {
 
 			// Use only when WP_DEBUG is enabled.
 			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-			    $logger->warning(
-			        sprintf(
+				$logger->warning(
+					sprintf(
 						'Invalid stock status received: %s.',
 						is_scalar( $status ) || is_object( $status ) ? maybe_serialize( $status ) : gettype( $status )
 					),
-			        $context
-			    );
+					$context
+				);
 			}
 		}
 

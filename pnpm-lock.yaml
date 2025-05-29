@@ -951,9 +951,6 @@ importers:
       '@types/testing-library__jest-dom':
         specifier: ^5.14.9
         version: 5.14.9
-      '@types/wordpress__data':
-        specifier: 6.0.0
-        version: 6.0.0
       '@woocommerce/data':
         specifier: workspace:*
         version: link:../data
@@ -2469,9 +2466,6 @@ importers:
       '@types/string-similarity':
         specifier: 4.0.0
         version: 4.0.0
-      '@types/wordpress__data':
-        specifier: 6.0.0
-        version: 6.0.0
       '@woocommerce/eslint-plugin':
         specifier: workspace:*
         version: link:../eslint-plugin
@@ -9951,9 +9945,6 @@ packages:
 
   '@types/wordpress__data-controls@2.2.0':
     resolution: {integrity: sha512-arDQ6Sds47Lq3ZZwgCrG1QTQjBIJPhv0vpJhv8zWXSINkL/Ourus0k4y+WkgnNT1aSpTSdrISrDlAwwPuy6usw==}
-
-  '@types/wordpress__data@6.0.0':
-    resolution: {integrity: sha512-+J6uLQjhT6zqDgOx4EtqJLMajYFP/thwW+WtZWX/SYZu8e3MqPnc1HaRdz6JGeKpjlpPr4UOpTB2nf/bWKrsGA==}
 
   '@types/wordpress__data@6.0.2':
     resolution: {integrity: sha512-Pu67knXXoTWgCpxTKwePNZz/iKkYe8AQbkkSD/Ba1mw8t4zgEM+jJs5IV5N5ij/awwjs4Subj8mkvS3jMTDwyw==}
@@ -34317,11 +34308,6 @@ snapshots:
     dependencies:
       '@types/wordpress__data': 6.0.2
       '@wordpress/api-fetch': 5.2.7
-
-  '@types/wordpress__data@6.0.0':
-    dependencies:
-      '@types/react': 18.3.16
-      redux: 4.2.1
 
   '@types/wordpress__data@6.0.2':
     dependencies:

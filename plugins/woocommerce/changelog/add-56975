@@ -1,0 +1,4 @@
+Significance: patch
+Type: dev
+
+Add unit test to cover shop page behavior when trashed

@@ -1,18 +1,24 @@
 <?php
+declare( strict_types = 1 );
+
 /**
  * Tests for Shop page behavior when trashed.
  */
-
 class WC_Tests_Shop_Page_Trashed extends WC_Unit_Test_Case {
 
+	/**
+	 * Tests shop page behavior when trashed.
+	 */
 	public function test_shop_page_trashed() {
 		// Create a Shop page.
-		$page_id = wp_insert_post( array(
-			'post_title'   => 'Shop',
-			'post_name'    => 'shop',
-			'post_status'  => 'publish',
-			'post_type'    => 'page',
-		) );
+		$page_id = wp_insert_post(
+			array(
+				'post_title'  => 'Shop',
+				'post_name'   => 'shop',
+				'post_status' => 'publish',
+				'post_type'   => 'page',
+			)
+		);
 
 		$this->assertNotEmpty( $page_id, 'Failed to create Shop page.' );
 

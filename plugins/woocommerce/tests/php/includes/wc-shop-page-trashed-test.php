@@ -12,22 +12,23 @@ class WC_Tests_Shop_Page_Trashed extends WC_Unit_Test_Case {
 	 * @return array[]
 	 */
 	public function theme_provider() {
-		return [
-			[ 'twentytwentyfour' ], // Block theme.
-			[ 'storefront' ],       // Classic theme.
-		];
+		return array(
+			array( 'twentytwentyfour' ), // Block theme.
+			array( 'storefront' ),       // Classic theme.
+		);
 	}
 
 	/**
 	 * Tests shop page behavior when trashed.
 	 *
 	 * @dataProvider theme_provider
+	 * @param string $theme the theme to switch to.
 	 */
 	public function test_shop_page_trashed( $theme ) {
 
 		// Switch to provided theme.
 		switch_theme( $theme );
-		echo "Switching theme: {$theme}" . PHP_EOL;
+		echo esc_html( "Switching theme: {$theme}" ) . PHP_EOL;
 
 		// Create a Shop page.
 		$page_id = wp_insert_post(

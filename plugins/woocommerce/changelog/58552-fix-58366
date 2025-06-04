@@ -1,0 +1,4 @@
+Significance: patch
+Type: fix
+Comment: Prevent fatal errors in set_stock_status() when unexpected or invalid input types are provided.
+

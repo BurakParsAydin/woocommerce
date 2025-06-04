@@ -1024,14 +1024,22 @@ class WC_Product extends WC_Abstract_Legacy_Product {
 	public function set_stock_status( $status = ProductStockStatus::IN_STOCK ) {
 		$valid_statuses = wc_get_product_stock_status_options();
 
-		// Check if status is a scalar or a stringable object.
-		if ( is_scalar( $status ) || ( is_object( $status ) && method_exists( $status, '__toString' ) ) ) {
-			$status = (string) $status;
-
-			if ( isset( $valid_statuses[ $status ] ) ) {
-				$this->set_prop( 'stock_status', $status );
-				return;
+		if ( is_string( $status ) ) {
+			$status = $status;
+		} elseif ( is_array( $status ) ) {
+			if ( empty( $status ) ) {
+				$status = null;
+			} else {
+				$status = $status[0];
 			}
+		} else {
+			$status = null;
+		}
+
+		// Validate.
+		if ( null !== $status && isset( $valid_statuses[ $status ] ) ) {
+			$this->set_prop( 'stock_status', $status );
+			return;
 		}
 
 		// Log warning about invalid input.

@@ -138,7 +138,6 @@
 		"@types/wordpress__block-editor": "11.5.16",
 		"@types/wordpress__blocks": "12.5.16",
 		"@types/wordpress__media-utils": "4.14.4",
-		"@types/wordpress__notices": "3.3.0",
 		"@typescript-eslint/eslint-plugin": "^5.62.0",
 		"@typescript-eslint/parser": "^5.62.0",
 		"@woocommerce/admin-e2e-tests": "workspace:*",

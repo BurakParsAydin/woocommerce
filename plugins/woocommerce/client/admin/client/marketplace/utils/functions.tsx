@@ -4,7 +4,6 @@
 import apiFetch from '@wordpress/api-fetch';
 import { __, sprintf } from '@wordpress/i18n';
 import { dispatch } from '@wordpress/data';
-import type { Options } from 'wordpress__notices';
 import { store as coreNoticesStore } from '@wordpress/notices';
 import { Icon } from '@wordpress/components';
 
@@ -30,6 +29,17 @@ import {
 } from '../components/product-list/types';
 import { NoticeStatus } from '../contexts/types';
 import { noticeStore } from '../contexts/notice-store';
+
+type Options = {
+	context?: string;
+	actions?: {
+		label: string;
+		url?: string;
+		onClick?(): void;
+	}[];
+	isDismissible?: boolean;
+	speak?: boolean;
+};
 
 interface ProductGroup {
 	id: string;

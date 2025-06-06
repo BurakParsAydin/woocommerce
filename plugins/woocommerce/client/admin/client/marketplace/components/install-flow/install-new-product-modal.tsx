@@ -7,7 +7,6 @@ import { dispatch } from '@wordpress/data';
 import { useState, useEffect, useContext } from '@wordpress/element';
 import { navigateTo, getNewPath, useQuery } from '@woocommerce/navigation';
 import { recordEvent } from '@woocommerce/tracks';
-import type { Status } from 'wordpress__notices';
 
 /**
  * Internal dependencies
@@ -46,7 +45,7 @@ function InstallNewProductModal( props: { products: Product[] } ) {
 	const [ showModal, setShowModal ] = useState< boolean >( false );
 	const [ notice, setNotice ] = useState< {
 		message: string;
-		status: Status;
+		status: 'error' | 'info' | 'success' | 'warning' | undefined;
 	} >();
 	const { addInstalledProduct } = useContext( MarketplaceContext );
 

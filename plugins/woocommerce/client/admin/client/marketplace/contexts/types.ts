@@ -1,12 +1,18 @@
 /**
- * External dependencies
- */
-import type { Options } from 'wordpress__notices';
-
-/**
  * Internal dependencies
  */
 import { Subscription } from '../components/my-subscriptions/types';
+
+type Options = {
+	context?: string;
+	actions?: {
+		label: string;
+		url?: string;
+		onClick?(): void;
+	}[];
+	isDismissible?: boolean;
+	speak?: boolean;
+};
 
 export interface SearchResultsCountType {
 	extensions: number;

@@ -1,0 +1,4 @@
+Significance: patch
+Type: dev
+Comment: Cleanup: Removed unused @types/wordpress__date, @types/wordpress__keycodes, @types/wordpress__notices, and @types/wordpress__rich-text packages
+

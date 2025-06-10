@@ -31,7 +31,7 @@ type Options = {
 type StoreLocationProps = {
 	onComplete: ( values: FormValues ) => void;
 	createNotice: (
-		status: 'error' | 'info' | 'success' | 'warning' | undefined,
+		status: React.ComponentProps< typeof Notice >[ 'status' ],
 		content: string,
 		options?: Partial< Options >
 	) => void;

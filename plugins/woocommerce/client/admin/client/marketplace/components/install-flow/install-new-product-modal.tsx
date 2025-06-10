@@ -45,7 +45,7 @@ function InstallNewProductModal( props: { products: Product[] } ) {
 	const [ showModal, setShowModal ] = useState< boolean >( false );
 	const [ notice, setNotice ] = useState< {
 		message: string;
-		status: 'error' | 'info' | 'success' | 'warning' | undefined;
+		status: React.ComponentProps< typeof Notice >[ 'status' ];
 	} >();
 	const { addInstalledProduct } = useContext( MarketplaceContext );
 

@@ -1,17 +1,19 @@
 /**
+ * External dependencies
+ */
+import type { WPNoticeAction } from '@wordpress/notices/build-types/store/actions';
+
+/**
  * Internal dependencies
  */
 import { Subscription } from '../components/my-subscriptions/types';
 
-type Options = {
+export type Options = {
 	context?: string;
-	actions?: {
-		label: string;
-		url?: string;
-		onClick?(): void;
-	}[];
+	actions?: Array< WPNoticeAction >;
 	isDismissible?: boolean;
 	speak?: boolean;
+	icon?: React.ReactNode;
 };
 
 export interface SearchResultsCountType {

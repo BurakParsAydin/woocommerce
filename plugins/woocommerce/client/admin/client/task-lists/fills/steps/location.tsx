@@ -2,7 +2,7 @@
  * External dependencies
  */
 import { __ } from '@wordpress/i18n';
-import { Button } from '@wordpress/components';
+import { Button, Notice } from '@wordpress/components';
 import { countriesStore } from '@woocommerce/data';
 import { Fragment, useState } from '@wordpress/element';
 import { Form, FormContextType, Spinner } from '@woocommerce/components';
@@ -17,16 +17,7 @@ import {
 	FormValues,
 } from '~/dashboard/components/settings/general/store-address';
 
-type Options = {
-	context?: string;
-	actions?: {
-		label: string;
-		url?: string;
-		onClick?(): void;
-	}[];
-	isDismissible?: boolean;
-	speak?: boolean;
-};
+import type { Options } from '../../../marketplace/contexts/types';
 
 type StoreLocationProps = {
 	onComplete: ( values: FormValues ) => void;

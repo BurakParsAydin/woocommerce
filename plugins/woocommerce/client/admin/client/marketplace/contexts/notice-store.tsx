@@ -6,18 +6,7 @@ import { createReduxStore, register } from '@wordpress/data';
 /**
  * Internal dependencies
  */
-import { NoticeState, Notice, NoticeStatus } from './types';
-
-type Options = {
-	context?: string;
-	actions?: {
-		label: string;
-		url?: string;
-		onClick?(): void;
-	}[];
-	isDismissible?: boolean;
-	speak?: boolean;
-};
+import { NoticeState, Notice, NoticeStatus, Options } from './types';
 
 const NOTICE_STORE_NAME = 'woocommerce-admin/subscription-notices';
 

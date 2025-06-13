@@ -27,19 +27,8 @@ import {
 	SearchAPIJSONType,
 	SearchAPIProductType,
 } from '../components/product-list/types';
-import { NoticeStatus } from '../contexts/types';
+import { NoticeStatus, Options } from '../contexts/types';
 import { noticeStore } from '../contexts/notice-store';
-
-type Options = {
-	context?: string;
-	actions?: {
-		label: string;
-		url?: string;
-		onClick?(): void;
-	}[];
-	isDismissible?: boolean;
-	speak?: boolean;
-};
 
 interface ProductGroup {
 	id: string;

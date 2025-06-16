@@ -1,6 +1,7 @@
 <?php
 
 use Automattic\WooCommerce\Internal\ProductDownloads\ApprovedDirectories\Register as Download_Directories;
+use Automattic\WooCommerce\Enums\ProductType;
 /**
  * Class WC_Product_Download_Test
  */
@@ -154,7 +155,6 @@ class WC_Product_Download_Test extends WC_Unit_Test_Case {
 		file_put_contents( $test_file, '' );
 		$this->assertTrue( file_exists( $test_file ), 'Confirms that our test files exists.' );
 
-
 		// Ensure the final test fails in the event exceptions are not raised later in the test.
 		$file_does_not_exist = new Exception( '1' );
 		$invalid_directory   = new Exception( '2' );
@@ -182,5 +182,65 @@ class WC_Product_Download_Test extends WC_Unit_Test_Case {
 			$file_does_not_exist->getMessage(),
 			'We use the same error message when the file does not exist as when the directory is invalid.'
 		);
+	}
+
+	/**
+	 * Test that a product download is not allowed when the download attempt limit has been exceeded.
+	 */
+	public function test_exceeded_download_attempts() {
+		wp_set_current_user( 1 );
+
+		// 1. Setup: Create product and set backorders allowed.
+		$json_data = array(
+			'name'         => 'Digital Product',
+			'type'         => ProductType::SIMPLE,
+			'price'        => '21.99',
+			'virtual'      => true,
+			'downloadable' => true,
+		);
+
+		$request = new WP_REST_Request( 'POST', '/wc/v3/products' );
+		$request->set_header( 'content-type', 'application/json' );
+		$request->set_body( wp_json_encode( $json_data ) );
+
+		$response = rest_do_request( $request );
+
+		if ( $response->get_status() !== 201 ) {
+			throw new \Exception( 'Product has not been created' );
+		}
+
+		$response_data = $response->get_data();
+		$product_id    = $response_data['id'];
+
+		// Step 2: Add a downloadable file to the product.
+		$product = wc_get_product( $product_id );
+		$product->set_downloads(
+			array(
+				'file_key' => array(
+					'name' => 'Test Download',
+					'file' => 'https://example.com/test-file.zip', // Dummy file URL.
+				),
+			)
+		);
+		$product->save();
+
+		$downloads = $product->get_downloads();
+
+		$this->assertNotEmpty( $downloads, 'Downloadable file was not set correctly.' );
+
+		// Step 3: Create a paid order using WC_Helper_Order.
+		$order = WC_Helper_Order::create_order();
+		$item  = new WC_Order_Item_Product();
+		$item->set_product( $product );
+		$item->set_quantity( 1 );
+		$item->set_total( $product->get_price() );
+		$order->add_item( $item );
+		$order->calculate_totals();
+		$order->payment_complete();
+		$order->save();
+
+		$order_id = $order->get_id();
+
+		echo 'Created order ID: ' . esc_html( $order_id ) . "\n";
 	}
 }

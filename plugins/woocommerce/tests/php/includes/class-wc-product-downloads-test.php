@@ -296,6 +296,108 @@ class WC_Product_Download_Test extends WC_Unit_Test_Case {
 	}
 
 	/**
+	 * Test that a product download is disallowed after the expiration date has passed.
+	 */
+	public function test_download_after_expiry() {
+		self::remove_download_handlers();
+
+		wp_set_current_user( 1 );
+
+		// Unregister download handlers to prevent unwanted output and side-effects.
+		remove_action( 'woocommerce_download_file_xsendfile', array( WC_Download_Handler::class, 'download_file_xsendfile' ) );
+		remove_action( 'woocommerce_download_file_redirect', array( WC_Download_Handler::class, 'download_file_redirect' ) );
+		remove_action( 'woocommerce_download_file_force', array( WC_Download_Handler::class, 'download_file_force' ) );
+
+		// 1. Setup: Create product and set backorders allowed.
+		$json_data = array(
+			'name'         => 'Digital Product',
+			'type'         => ProductType::SIMPLE,
+			'price'        => '21.99',
+			'virtual'      => true,
+			'downloadable' => true,
+		);
+
+		$request = new WP_REST_Request( 'POST', '/wc/v3/products' );
+		$request->set_header( 'content-type', 'application/json' );
+		$request->set_body( wp_json_encode( $json_data ) );
+
+		$response = rest_do_request( $request );
+
+		if ( $response->get_status() !== 201 ) {
+			throw new \Exception( 'Product has not been created' );
+		}
+
+		$response_data = $response->get_data();
+		$product_id    = $response_data['id'];
+
+		// Step 2: Add a downloadable file to the product.
+		$product = wc_get_product( $product_id );
+		$product->set_downloads(
+			array(
+				'file_key' => array(
+					'name' => 'Test Download',
+					'file' => 'https://example.com/test-file.zip', // Dummy file URL.
+				),
+			)
+		);
+		$product->save();
+		$downloads = $product->get_downloads();
+		$this->assertNotEmpty( $downloads, 'Downloadable file was not set correctly.' );
+
+		// Step 3: Create a paid order using WC_Helper_Order.
+		$order = new WC_Order();
+		$item  = new WC_Order_Item_Product();
+		$item->set_product( $product );
+		$item->set_total( $product->get_price() );
+		$order->add_item( $item );
+		$order->set_billing_email( 'admin@example.org' );
+		$order->set_status( OrderStatus::COMPLETED );
+		$order->save();
+
+		$order_id = $order->get_id();
+		echo 'Created order ID: ' . esc_html( $order_id ) . "\n";
+
+		// Step 4: Set the expiry date. And go to the url if the download exists or not.
+		$downloads     = $product->get_downloads();
+		$download_keys = array_keys( $downloads );
+		$email         = 'admin@example.org';
+		$download      = current( WC_Data_Store::load( 'customer-download' )->get_downloads( array( 'product_id' => $product_id ) ) );
+		$download->set_access_expires( '2020-01-01 00:00:00' );
+		$download->save();
+
+		$_GET = array(
+			'download_file' => $product_id,
+			'order'         => $order->get_order_key(),
+			'email'         => $email,
+			'uid'           => hash( 'sha256', $email ),
+			'key'           => $download_keys[0],
+		);
+
+		// Simulate the download.
+		ob_start();
+		try {
+			WC_Download_Handler::download_product();
+		} catch ( \WPDieException $e ) {
+			$this->assertStringContainsString(
+				'Sorry, this download has expired',
+				$e->getMessage()
+			);
+		}
+		ob_end_clean();
+
+		$download            = new WC_Customer_Download( $download->get_id() );
+		$downloads_available = wc_get_customer_available_downloads( 1 );
+
+		$this->assertCount(
+			0,
+			$downloads_available,
+			'Expected no available downloads when the expiration date has passed.'
+		);
+
+		self::restore_download_handlers();
+	}
+
+	/**
 	 * Unregister download handlers to prevent unwanted output and side-effects.
 	 */
 	private static function remove_download_handlers() {

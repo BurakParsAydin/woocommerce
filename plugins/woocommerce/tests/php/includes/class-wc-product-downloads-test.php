@@ -186,9 +186,9 @@ class WC_Product_Download_Test extends WC_Unit_Test_Case {
 	}
 
 	/**
-	 * Test that a product download is not allowed when the download attempt limit has been exceeded.
+	 * Test that a product download is not allowed when the downloads remaining set to 0.
 	 */
-	public function test_exceeded_download_attempts() {
+	public function test_downloads_remaining_attempts() {
 		self::remove_download_handlers();
 
 		wp_set_current_user( 1 );

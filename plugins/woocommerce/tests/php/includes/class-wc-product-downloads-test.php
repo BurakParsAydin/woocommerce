@@ -189,6 +189,14 @@ class WC_Product_Download_Test extends WC_Unit_Test_Case {
 	 * Test that a product download is not allowed when the download attempt limit has been exceeded.
 	 */
 	public function test_exceeded_download_attempts() {
+		self::remove_download_handlers();
+
+		wp_set_current_user( 1 );
+
+		// Unregister download handlers to prevent unwanted output and side-effects.
+		remove_action( 'woocommerce_download_file_xsendfile', array( WC_Download_Handler::class, 'download_file_xsendfile' ) );
+		remove_action( 'woocommerce_download_file_redirect', array( WC_Download_Handler::class, 'download_file_redirect' ) );
+		remove_action( 'woocommerce_download_file_force', array( WC_Download_Handler::class, 'download_file_force' ) );
 
 		// 1. Setup: Create product and set backorders allowed.
 		$json_data = array(
@@ -232,6 +240,7 @@ class WC_Product_Download_Test extends WC_Unit_Test_Case {
 		$item->set_product( $product );
 		$item->set_total( $product->get_price() );
 		$order->add_item( $item );
+		$order->set_billing_email( 'admin@example.org' );
 		$order->set_status( OrderStatus::COMPLETED );
 		$order->save();
 
@@ -244,10 +253,9 @@ class WC_Product_Download_Test extends WC_Unit_Test_Case {
 		$email         = 'admin@example.org';
 		$download      = current( WC_Data_Store::load( 'customer-download' )->get_downloads( array( 'product_id' => $product_id ) ) );
 
-		$download->set_downloads_remaining( 10 );
+		$download->set_downloads_remaining( 0 );
 		$download->save();
 
-		// phpcs:disable WordPress.Security.NonceVerification.Recommended WordPress.Security.ValidatedSanitizedInput.InputNotValidated
 		$_GET = array(
 			'download_file' => $product_id,
 			'order'         => $order->get_order_key(),
@@ -256,13 +264,52 @@ class WC_Product_Download_Test extends WC_Unit_Test_Case {
 			'key'           => $download_keys[0],
 		);
 
-		WC_Download_Handler::download_product();
+		// Simulate the download.
+		ob_start();
+		try {
+			WC_Download_Handler::download_product();
+		} catch ( \WPDieException $e ) {
+			$this->assertStringContainsString(
+				'Sorry, you have reached your download limit',
+				$e->getMessage()
+			);
+		}
+		ob_end_clean();
+
+		// Ensure download count hasn't changed.
 		$download = new WC_Customer_Download( $download->get_id() );
 		$this->assertEquals(
-			9,
+			0,
 			$download->get_downloads_remaining(),
-			'In relation to "normal" download requests, we should see a reduction in the downloads remaining count.'
+			'Expected remaining downloads to be 0.'
 		);
 
+		$downloads_available = wc_get_customer_available_downloads( 1 );
+
+		$this->assertCount(
+			0,
+			$downloads_available,
+			'Expected no available downloads when download limit is reached.'
+		);
+
+		self::restore_download_handlers();
+	}
+
+	/**
+	 * Unregister download handlers to prevent unwanted output and side-effects.
+	 */
+	private static function remove_download_handlers() {
+		remove_action( 'woocommerce_download_file_xsendfile', array( WC_Download_Handler::class, 'download_file_xsendfile' ) );
+		remove_action( 'woocommerce_download_file_redirect', array( WC_Download_Handler::class, 'download_file_redirect' ) );
+		remove_action( 'woocommerce_download_file_force', array( WC_Download_Handler::class, 'download_file_force' ) );
+	}
+
+	/**
+	 * Restores download handlers in case needed by other tests.
+	 */
+	private static function restore_download_handlers() {
+		add_action( 'woocommerce_download_file_redirect', array( WC_Download_Handler::class, 'download_file_redirect' ), 10, 2 );
+		add_action( 'woocommerce_download_file_xsendfile', array( WC_Download_Handler::class, 'download_file_xsendfile' ), 10, 2 );
+		add_action( 'woocommerce_download_file_force', array( WC_Download_Handler::class, 'download_file_force' ), 10, 2 );
 	}
 }

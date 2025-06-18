@@ -2,6 +2,7 @@
 
 use Automattic\WooCommerce\Internal\ProductDownloads\ApprovedDirectories\Register as Download_Directories;
 use Automattic\WooCommerce\Enums\ProductType;
+use Automattic\WooCommerce\Enums\OrderStatus;
 /**
  * Class WC_Product_Download_Test
  */
@@ -188,7 +189,6 @@ class WC_Product_Download_Test extends WC_Unit_Test_Case {
 	 * Test that a product download is not allowed when the download attempt limit has been exceeded.
 	 */
 	public function test_exceeded_download_attempts() {
-		wp_set_current_user( 1 );
 
 		// 1. Setup: Create product and set backorders allowed.
 		$json_data = array(
@@ -223,24 +223,46 @@ class WC_Product_Download_Test extends WC_Unit_Test_Case {
 			)
 		);
 		$product->save();
-
 		$downloads = $product->get_downloads();
-
 		$this->assertNotEmpty( $downloads, 'Downloadable file was not set correctly.' );
 
 		// Step 3: Create a paid order using WC_Helper_Order.
-		$order = WC_Helper_Order::create_order();
+		$order = new WC_Order();
 		$item  = new WC_Order_Item_Product();
 		$item->set_product( $product );
-		$item->set_quantity( 1 );
 		$item->set_total( $product->get_price() );
 		$order->add_item( $item );
-		$order->calculate_totals();
-		$order->payment_complete();
+		$order->set_status( OrderStatus::COMPLETED );
 		$order->save();
 
 		$order_id = $order->get_id();
-
 		echo 'Created order ID: ' . esc_html( $order_id ) . "\n";
+
+		// Step 4: Set 'Downloads Remainings' to 0. And go to the url if the download exists or not.
+		$downloads     = $product->get_downloads();
+		$download_keys = array_keys( $downloads );
+		$email         = 'admin@example.org';
+		$download      = current( WC_Data_Store::load( 'customer-download' )->get_downloads( array( 'product_id' => $product_id ) ) );
+
+		$download->set_downloads_remaining( 10 );
+		$download->save();
+
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended WordPress.Security.ValidatedSanitizedInput.InputNotValidated
+		$_GET = array(
+			'download_file' => $product_id,
+			'order'         => $order->get_order_key(),
+			'email'         => $email,
+			'uid'           => hash( 'sha256', $email ),
+			'key'           => $download_keys[0],
+		);
+
+		WC_Download_Handler::download_product();
+		$download = new WC_Customer_Download( $download->get_id() );
+		$this->assertEquals(
+			9,
+			$download->get_downloads_remaining(),
+			'In relation to "normal" download requests, we should see a reduction in the downloads remaining count.'
+		);
+
 	}
 }

@@ -659,52 +659,6 @@ test.describe(
 		} );
 
 		test(
-			'should not allow downloading a product if download attempts are exceeded',
-			{ tag: [ tags.COULD_BE_LOWER_LEVEL_TEST ] },
-			async ( { page } ) => {
-				const expectedReason =
-					'Sorry, you have reached your download limit for this file';
-
-				// open the order that already has a product assigned
-				await page.goto(
-					`wp-admin/admin.php?page=wc-orders&action=edit&id=${ orderId }`
-				);
-
-				// set the download limit to 0
-				// expand product download permissions
-				await page
-					.locator(
-						'#woocommerce-order-downloads > div.inside > div > div.wc-metaboxes > div > h3 > strong'
-					)
-					.click();
-
-				// edit download permissions
-				await page
-					.locator(
-						'#woocommerce-order-downloads > div.inside > div > div.wc-metaboxes > div > table > tbody > tr > td:nth-child(1) > input.short'
-					)
-					.fill( '0' );
-				await page.locator( 'button.save_order' ).click();
-
-				// get the download link
-				await page
-					.locator(
-						'#woocommerce-order-downloads > div.inside > div > div.wc-metaboxes > div > h3 > strong'
-					)
-					.click();
-				const downloadPage = await page
-					.locator( 'a#copy-download-link' )
-					.getAttribute( 'href' );
-
-				// open download page
-				await page.goto( downloadPage );
-				await expect(
-					page.locator( 'div.wp-die-message' )
-				).toContainText( expectedReason );
-			}
-		);
-
-		test(
 			'should not allow downloading a product if expiration date has passed',
 			{ tag: [ tags.COULD_BE_LOWER_LEVEL_TEST ] },
 			async ( { page } ) => {

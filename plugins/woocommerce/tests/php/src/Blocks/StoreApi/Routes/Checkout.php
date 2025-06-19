@@ -20,6 +20,7 @@ use Automattic\WooCommerce\Enums\ProductStockStatus;
 use Mockery\Adapter\Phpunit\MockeryTestCase;
 use WC_Gateway_BACS;
 
+
 /**
  * Checkout Controller Tests.
  *
@@ -1788,4 +1789,112 @@ class Checkout extends MockeryTestCase {
 		// Order shouldn't stay in custom status, instead we let payment gateway set the correct status.
 		$this->assertEquals( 'on-hold', $order->get_status(), 'Order status should be controlled by the payment gateway, not remain custom.' );
 	}
+
+
+	public function test_fully_updates_both_addresses() {
+		$request = new \WP_REST_Request( 'PUT', '/wc/store/v1/checkout' );
+		$request->set_header( 'Nonce', wp_create_nonce( 'wc_store_api' ) );
+		$request->set_body_params(
+			array(
+				'billing_address'  => (object) array(
+					'first_name' => 'Jane',
+					'last_name'  => 'Doe',
+					'address_1'  => '123 Main St',
+					'city'       => 'Los Angeles',
+					'postcode'   => '90001',
+					'country'    => 'US',
+					'email'      => 'jane@example.com',
+				),
+				'shipping_address' => (object) array(
+					'first_name' => 'John',
+					'last_name'  => 'Smith',
+					'address_1'  => '456 Elm St',
+					'city'       => 'San Francisco',
+					'postcode'   => '94105',
+					'country'    => 'US',
+				),
+			)
+		);
+		$response = rest_get_server()->dispatch( $request );
+		$this->assertEquals( 200, $response->get_status() );
+		$data = $response->get_data();
+		$this->assertEquals( 'Jane', $data['billing_address']['first_name'] );
+		$this->assertEquals( 'Smith', $data['shipping_address']['last_name'] );
+	}
+
+	public function test_partially_updates_both_addresses() {
+		// First, perform full update to simulate existing state
+		WC()->session->set( 'billing_address', array( 'first_name' => 'OldName', 'city' => 'OldCity' ) );
+		WC()->session->set( 'shipping_address', array( 'last_name' => 'OldLast', 'postcode' => '11111' ) );
+
+		$request = new \WP_REST_Request( 'PUT', '/wc/store/v1/checkout' );
+		$request->set_header( 'Nonce', wp_create_nonce( 'wc_store_api' ) );
+		$request->set_body_params(
+			array(
+				'billing_address'  => (object) array(
+					'city' => 'New York',
+				),
+				'shipping_address' => (object) array(
+					'postcode' => '90210',
+				),
+			)
+		);
+		$response = rest_get_server()->dispatch( $request );
+		$this->assertEquals( 200, $response->get_status() );
+		$data = $response->get_data();
+		$this->assertEquals( 'New York', $data['billing_address']['city'] );
+		$this->assertEquals( '90210', $data['shipping_address']['postcode'] );
+	}
+
+	public function test_updates_additional_checkout_fields() {
+		woocommerce_register_additional_checkout_field( array(
+			'id'       => 'custom_note',
+			'label'    => 'Custom Note',
+			'location' => 'order',
+			'type'     => 'text',
+		) );
+
+		$request = new \WP_REST_Request( 'PUT', '/wc/store/v1/checkout' );
+		$request->set_header( 'Nonce', wp_create_nonce( 'wc_store_api' ) );
+		$request->set_body_params(
+			array(
+				'additional_fields' => array(
+					'custom_note' => 'Leave at the door.',
+				),
+			)
+		);
+
+		$response = rest_get_server()->dispatch( $request );
+		$this->assertEquals( 200, $response->get_status() );
+		$order_id = $response->get_data()['order_id'] ?? null;
+
+		if ( $order_id ) {
+			$order = wc_get_order( $order_id );
+			$value = $order->get_meta( 'custom_note' );
+			$this->assertEquals( 'Leave at the door.', $value );
+		}
+	}
+
+	public function test_changes_shipping_method() {
+		WC()->cart->calculate_totals();
+		$packages = WC()->shipping->get_packages();
+		$available_methods = $packages[0]['rates'];
+		$method_id = array_key_first( $available_methods );
+
+		WC()->session->set( 'chosen_shipping_methods', array( $method_id ) );
+
+		$request = new \WP_REST_Request( 'PUT', '/wc/store/v1/checkout' );
+		$request->set_header( 'Nonce', wp_create_nonce( 'wc_store_api' ) );
+		$request->set_body_params(
+			array(
+				'shipping_rate_id' => $method_id,
+			)
+		);
+
+		$response = rest_get_server()->dispatch( $request );
+		$this->assertEquals( 200, $response->get_status() );
+		$data = $response->get_data();
+		$this->assertEquals( $method_id, $data['shipping_rate']['rate_id'] ?? null );
+	}
+
 }

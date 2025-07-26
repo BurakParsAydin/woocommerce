@@ -256,6 +256,26 @@ class WC_REST_Orders_Controller extends WC_REST_Orders_V2_Controller {
 	protected function save_object( $request, $creating = false ) {
 		$object = null;
 		try {
+			// Pre-validate all coupon codes to avoid partial updates.
+			if ( isset( $request['coupon_lines'] ) && is_array( $request['coupon_lines'] ) ) {
+				foreach ( $request['coupon_lines'] as $item ) {
+					$coupon_code = ArrayUtil::get_value_or_default( $item, 'code' );
+
+					if ( StringUtil::is_null_or_whitespace( $coupon_code ) ) {
+						throw new WC_REST_Exception( 'woocommerce_rest_invalid_coupon', __( 'Coupon code is required.', 'woocommerce' ), 400 );
+					}
+
+					$coupon_code = wc_format_coupon_code( wc_clean( $coupon_code ) );
+					$coupon      = new WC_Coupon( $coupon_code );
+					$discounts   = new WC_Discounts( new WC_Order() );
+					$check       = $discounts->is_coupon_valid( $coupon );
+
+					if ( is_wp_error( $check ) ) {
+						throw new WC_REST_Exception( 'woocommerce_rest_' . $check->get_error_code(), $check->get_error_message(), 400 );
+					}
+				}
+			}
+
 			$object = $this->prepare_object_for_database( $request, $creating );
 
 			if ( is_wp_error( $object ) ) {

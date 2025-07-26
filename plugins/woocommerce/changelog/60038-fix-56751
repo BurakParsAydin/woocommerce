@@ -1,0 +1,4 @@
+Significance: patch
+Type: fix
+Comment: Prevented partial order updates through the REST API when coupon validation fails.
+

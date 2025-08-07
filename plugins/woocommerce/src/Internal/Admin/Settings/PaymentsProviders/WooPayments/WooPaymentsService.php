@@ -480,10 +480,19 @@ class WooPaymentsService {
 	 *
 	 * @return bool Whether the onboarding step was cleaned.
 	 * @throws ApiArgumentException If the given onboarding step ID is invalid.
-	 * @throws ApiException If the onboarding action can not be performed due to the current state of the site.
 	 */
 	public function clean_onboarding_step_progress( string $step_id, string $location ): bool {
-		$this->check_if_onboarding_step_action_is_acceptable( $step_id, $location );
+		// We need to do reduced acceptance checks here because this is a cleanup action.
+		// First, check general if the onboarding action is acceptable.
+		$this->check_if_onboarding_action_is_acceptable();
+		// Second, check if the step ID is valid.
+		if ( ! $this->is_valid_onboarding_step_id( $step_id ) ) {
+			throw new ApiArgumentException(
+				'woocommerce_woopayments_onboarding_invalid_step_id',
+				esc_html__( 'Invalid onboarding step ID.', 'woocommerce' ),
+				(int) WP_Http::BAD_REQUEST
+			);
+		}
 
 		// Clear possible failed or blocked status for the step.
 		$this->clear_onboarding_step_failed( $step_id, $location );
@@ -1774,7 +1783,8 @@ class WooPaymentsService {
 			// Try to generate the authorization URL.
 			$wpcom_connection = $this->get_wpcom_connection_authorization( $return_url );
 			if ( ! $wpcom_connection['success'] ) {
-				$wpcom_step['errors'] = array_values( $wpcom_connection['errors'] );
+				// In case of errors, make sure we work with a list of error messages.
+				$wpcom_step['errors'] = array_values( (array) ( $wpcom_connection['errors'] ?? array() ) );
 			}
 			$wpcom_step['actions'] = array(
 				'start' => array(
@@ -1818,6 +1828,11 @@ class WooPaymentsService {
 				);
 			}
 
+			$test_account_step['actions']['reset'] = array(
+				'type' => self::ACTION_TYPE_REST,
+				'href' => rest_url( trailingslashit( $rest_path ) . self::ONBOARDING_STEP_TEST_ACCOUNT . '/reset' ),
+			);
+
 			$steps[] = $test_account_step;
 		}
 
@@ -1852,29 +1867,33 @@ class WooPaymentsService {
 		// If the step is not completed, we need to add the actions.
 		if ( self::ONBOARDING_STEP_STATUS_COMPLETED !== $business_verification_step['status'] ) {
 			$business_verification_step['actions'] = array(
-				'start'              => array(
+				'start'                => array(
 					'type' => self::ACTION_TYPE_REST,
 					'href' => rest_url( trailingslashit( $rest_path ) . self::ONBOARDING_STEP_BUSINESS_VERIFICATION . '/start' ),
 				),
-				'save'               => array(
+				'save'                 => array(
 					'type' => self::ACTION_TYPE_REST,
 					'href' => rest_url( trailingslashit( $rest_path ) . self::ONBOARDING_STEP_BUSINESS_VERIFICATION . '/save' ),
 				),
-				'kyc_session'        => array(
+				'kyc_session'          => array(
 					'type' => self::ACTION_TYPE_REST,
 					'href' => rest_url( trailingslashit( $rest_path ) . self::ONBOARDING_STEP_BUSINESS_VERIFICATION . '/kyc_session' ),
 				),
-				'kyc_session_finish' => array(
+				'kyc_session_finish'   => array(
 					'type' => self::ACTION_TYPE_REST,
 					'href' => rest_url( trailingslashit( $rest_path ) . self::ONBOARDING_STEP_BUSINESS_VERIFICATION . '/kyc_session/finish' ),
 				),
-				'kyc_fallback'       => array(
+				'kyc_fallback'         => array(
 					'type' => self::ACTION_TYPE_REDIRECT,
 					'href' => $this->get_onboarding_kyc_fallback_url(),
 				),
-				'finish'             => array(
+				'finish'               => array(
 					'type' => self::ACTION_TYPE_REST,
 					'href' => rest_url( trailingslashit( $rest_path ) . self::ONBOARDING_STEP_BUSINESS_VERIFICATION . '/finish' ),
+				),
+				'test_account_disable' => array(
+					'type' => self::ACTION_TYPE_REST,
+					'href' => rest_url( trailingslashit( $rest_path ) . self::ONBOARDING_STEP_BUSINESS_VERIFICATION . '/test_account/disable' ),
 				),
 			);
 		}

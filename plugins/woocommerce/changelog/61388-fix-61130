@@ -1,0 +1,4 @@
+Significance: patch
+Type: fix
+Comment: Hide "Deactivate" for legacy PayPal Standard to prevent accidental WooCommerce deactivation (#61130).
+

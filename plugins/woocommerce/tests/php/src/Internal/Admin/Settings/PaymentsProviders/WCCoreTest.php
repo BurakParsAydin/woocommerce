@@ -116,4 +116,21 @@ class WCCoreTest extends WC_Unit_Test_Case {
 		// Assert.
 		$this->assertEquals( plugins_url( 'assets/images/payment_methods/72x72/paypal.png', WC_PLUGIN_FILE ), $gateway_details );
 	}
+
+	/**
+	 * Check if the paypal file is empty.
+	 */
+	public function test_paypal_file_empty() {
+		$fake_gateway = new FakePaymentGateway(
+			WC_Gateway_Paypal::ID,
+			array(
+				'plugin_file' => 'woocommerce/woocommerce.php',
+			)
+		);
+
+		$details = $this->sut->get_plugin_details( $fake_gateway );
+
+		$this->assertArrayHasKey( 'file', $details );
+		$this->assertSame( '', $details['file'] );
+	}
 }

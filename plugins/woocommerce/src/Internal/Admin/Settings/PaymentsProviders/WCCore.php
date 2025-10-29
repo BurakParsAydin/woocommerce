@@ -92,7 +92,6 @@ class WCCore extends PaymentGateway {
 		return parent::is_in_test_mode_onboarding( $payment_gateway );
 	}
 
-
 	/**
 	 * Hide the "Deactivate" action for legacy PayPal Standard by omitting the plugin file.
 	 *

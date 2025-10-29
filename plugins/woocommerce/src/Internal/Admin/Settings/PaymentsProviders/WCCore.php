@@ -95,7 +95,7 @@ class WCCore extends PaymentGateway {
 	/**
 	 * Hide the "Deactivate" action for legacy PayPal Standard by omitting the plugin file.
 	 *
-	 * @param \WC_Payment_Gateway $payment_gateway
+	 * @param \WC_Payment_Gateway $payment_gateway The payment gateway object.
 	 * @return array
 	 */
 	public function get_plugin_details( \WC_Payment_Gateway $payment_gateway ): array {
@@ -104,11 +104,10 @@ class WCCore extends PaymentGateway {
 		// Legacy PayPal Standard (gateway id 'paypal') lives in WooCommerce core.
 		// If we provide a plugin 'file', the UI will offer "Deactivate" for that plugin.
 		// Remove the file so the UI cannot render a Deactivate action for this row.
-		if ( isset($payment_gateway->id) && 'paypal' === $payment_gateway->id ) {
+		if ( isset( $payment_gateway->id ) && 'paypal' === $payment_gateway->id ) {
 			$details['file'] = '';
 		}
 
 		return $details;
 	}
-
 }

@@ -1,5 +1,5 @@
 /* eslint-disable @woocommerce/dependency-group -- because we import mocks first, we deactivate this rule to avoid ESLint errors */
-import '../../__mocks__/setup-shared-mocks';
+import '../../test/__mocks__/setup-shared-mocks';
 
 /**
  * External dependencies
@@ -54,6 +54,7 @@ describe( 'CategorySection', () => {
 				valueToInsert: '[woocommerce/customer-name]',
 				category: 'Customer',
 				attributes: [],
+				postTypes: [ 'woo_mail' ],
 			},
 			{
 				name: 'Customer Email',
@@ -61,6 +62,7 @@ describe( 'CategorySection', () => {
 				valueToInsert: '[woocommerce/customer-email]',
 				category: 'Customer',
 				attributes: [],
+				postTypes: [ 'woo_mail' ],
 			},
 		],
 		Link: [
@@ -70,6 +72,7 @@ describe( 'CategorySection', () => {
 				valueToInsert: '[woocommerce/profile-url]',
 				category: 'Link',
 				attributes: [],
+				postTypes: [ 'woo_mail' ],
 			},
 		],
 	};

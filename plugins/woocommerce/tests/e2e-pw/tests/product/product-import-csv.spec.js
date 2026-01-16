@@ -2,13 +2,13 @@
  * External dependencies
  */
 import path from 'path';
+import { WC_API_PATH } from '@woocommerce/e2e-utils-playwright';
 
 /**
  * Internal dependencies
  */
 import { test, expect, tags } from '../../fixtures/fixtures';
 import { ADMIN_STATE_PATH } from '../../playwright.config';
-import { WC_API_PATH } from '../../utils/api-client';
 
 const filePath = path.resolve( 'tests/e2e-pw/test-data/sample_products.csv' );
 const filePathOverride = path.resolve(
@@ -211,10 +211,15 @@ test.describe( 'Import Products from a CSV file', () => {
 			await page.locator( '#post-search-input' ).fill( 'Imported' );
 			await page.locator( '#search-submit' ).click();
 
+			// Wait for search results to load completely
+			await page.waitForSelector( 'a.row-title', { timeout: 30000 } );
+
 			// Compare imported products to what's expected
 			await expect( page.locator( 'a.row-title' ) ).toHaveCount(
-				productNames.length
+				productNames.length,
+				{ timeout: 30000 }
 			);
+
 			const productTitles = await page
 				.locator( 'a.row-title' )
 				.allTextContents();
@@ -257,7 +262,6 @@ test.describe( 'Import Products from a CSV file', () => {
 			await page.locator( '#post-search-input' ).fill( 'Imported' );
 			await page.locator( '#search-submit' ).click();
 
-			// Compare imported products to what's expected
 			await expect( page.locator( 'a.row-title' ) ).toHaveCount(
 				productNamesOverride.length
 			);

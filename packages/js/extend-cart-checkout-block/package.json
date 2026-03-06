@@ -1,6 +1,6 @@
 {
 	"name": "@woocommerce/extend-cart-checkout-block",
-	"version": "1.5.0",
+	"version": "1.5.1",
 	"description": "",
 	"main": "index.js",
 	"engines": {
@@ -12,7 +12,7 @@
 	},
 	"keywords": [],
 	"author": "",
-	"license": "ISC",
+	"license": "GPL-2.0-or-later",
 	"bugs": {
 		"url": "https://github.com/woocommerce/woocommerce/issues"
 	},

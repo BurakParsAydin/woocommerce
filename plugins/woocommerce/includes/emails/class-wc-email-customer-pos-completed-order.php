@@ -35,6 +35,7 @@ if ( ! class_exists( 'WC_Email_Customer_POS_Completed_Order', false ) ) :
 			$this->id             = 'customer_pos_completed_order';
 			$this->customer_email = true;
 			$this->title          = __( 'POS completed order', 'woocommerce' );
+			$this->email_group    = 'payments';
 			$this->template_html  = 'emails/customer-pos-completed-order.php';
 			$this->template_plain = 'emails/plain/customer-pos-completed-order.php';
 			$this->placeholders   = array(
@@ -49,10 +50,15 @@ if ( ! class_exists( 'WC_Email_Customer_POS_Completed_Order', false ) ) :
 
 			// Must be after parent's constructor which sets `email_improvements_enabled` property.
 			$this->description = $this->email_improvements_enabled
-				? __( 'Let shoppers know once their POS order is complete.', 'woocommerce' )
+				? __( 'Let customers know once their POS order is complete.', 'woocommerce' )
 				: __( 'Order complete emails are sent to customers when their POS orders are marked completed.', 'woocommerce' );
 
 			$this->manual = true;
+
+			if ( $this->block_email_editor_enabled ) {
+				$this->title       = __( 'POS order complete', 'woocommerce' );
+				$this->description = __( 'Notifies customers when their in-person (POS) order has been completed.', 'woocommerce' );
+			}
 		}
 
 		/**
@@ -60,6 +66,8 @@ if ( ! class_exists( 'WC_Email_Customer_POS_Completed_Order', false ) ) :
 		 *
 		 * @param int    $order_id The order ID.
 		 * @param string $template_id The email template ID.
+		 *
+		 * @internal For exclusive usage within this class, backwards compatibility not guaranteed.
 		 */
 		public function trigger( $order_id, $template_id ) {
 			if ( $this->id !== $template_id ) {
@@ -115,6 +123,8 @@ if ( ! class_exists( 'WC_Email_Customer_POS_Completed_Order', false ) ) :
 		 */
 		public function get_content_html() {
 			$this->add_pos_customizations();
+			add_action( 'woocommerce_pos_email_header', array( $this, 'email_header' ) );
+			add_action( 'woocommerce_pos_email_footer', array( $this, 'email_footer' ) );
 			$content = wc_get_template_html(
 				$this->template_html,
 				array(
@@ -132,6 +142,8 @@ if ( ! class_exists( 'WC_Email_Customer_POS_Completed_Order', false ) ) :
 				)
 			);
 			$this->remove_pos_customizations();
+			remove_action( 'woocommerce_pos_email_header', array( $this, 'email_header' ) );
+			remove_action( 'woocommerce_pos_email_footer', array( $this, 'email_footer' ) );
 			return $content;
 		}
 
@@ -181,11 +193,30 @@ if ( ! class_exists( 'WC_Email_Customer_POS_Completed_Order', false ) ) :
 		}
 
 		/**
+		 * Auto-trigger this email when a POS-paid order is completed.
+		 *
+		 * @param int            $order_id The order ID.
+		 * @param WC_Order|false $order    The order object.
+		 *
+		 * @internal
+		 * @since 10.6.0
+		 */
+		public function auto_trigger( $order_id, $order = false ): void {
+			if ( ! $order instanceof WC_Order ) {
+				$order = wc_get_order( $order_id );
+			}
+			if ( ! $order instanceof WC_Order || ! PointOfSaleOrderUtil::is_order_paid_at_pos( $order ) ) {
+				return;
+			}
+			$this->trigger( $order_id, $this->id );
+		}
+
+		/**
 		 * Enable order email actions for POS orders.
 		 */
 		private function enable_order_email_actions_for_pos_orders() {
+			add_action( 'woocommerce_order_status_completed_notification', array( $this, 'auto_trigger' ), 10, 2 );
 			$this->enable_email_template_for_pos_orders();
-			// Enable send email when requested.
 			add_action( 'woocommerce_rest_order_actions_email_send', array( $this, 'trigger' ), 10, 2 );
 		}
 
@@ -245,6 +276,8 @@ if ( ! class_exists( 'WC_Email_Customer_POS_Completed_Order', false ) ) :
 			add_action( 'woocommerce_order_item_meta_start', array( $this, 'add_unit_price' ), 10, 4 );
 			// Add filter to include additional details in the order item totals table.
 			add_filter( 'woocommerce_get_order_item_totals', array( $this, 'order_item_totals' ), 10, 3 );
+			// Add filter for custom footer text with highest priority to run before the default footer text filtering in `WC_Emails`.
+			add_filter( 'woocommerce_email_footer_text', array( $this, 'replace_footer_placeholders' ), 1, 2 );
 		}
 
 		/**
@@ -254,6 +287,40 @@ if ( ! class_exists( 'WC_Email_Customer_POS_Completed_Order', false ) ) :
 			// Remove actions and filters after generating content to avoid affecting other emails.
 			remove_action( 'woocommerce_order_item_meta_start', array( $this, 'add_unit_price' ), 10 );
 			remove_filter( 'woocommerce_get_order_item_totals', array( $this, 'order_item_totals' ), 10 );
+			remove_filter( 'woocommerce_email_footer_text', array( $this, 'replace_footer_placeholders' ), 1 );
+		}
+
+		/**
+		 * Get the email header.
+		 *
+		 * @param mixed $email_heading Heading for the email.
+		 *
+		 * @internal For exclusive usage within this class, backwards compatibility not guaranteed.
+		 */
+		public function email_header( $email_heading ) {
+			wc_get_template(
+				'emails/email-header.php',
+				array(
+					'email_heading' => $email_heading,
+					'store_name'    => $this->get_pos_store_name(),
+				)
+			);
+		}
+
+		/**
+		 * Get the email footer.
+		 *
+		 * @param mixed $email Email object.
+		 *
+		 * @internal For exclusive usage within this class, backwards compatibility not guaranteed.
+		 */
+		public function email_footer( $email ) {
+			wc_get_template(
+				'emails/email-footer.php',
+				array(
+					'email' => $email,
+				)
+			);
 		}
 
 		/**
@@ -262,6 +329,8 @@ if ( ! class_exists( 'WC_Email_Customer_POS_Completed_Order', false ) ) :
 		 * @param int      $item_id       Order item ID.
 		 * @param array    $item          Order item data.
 		 * @param WC_Order $order         Order object.
+		 *
+		 * @internal For exclusive usage within this class, backwards compatibility not guaranteed.
 		 */
 		public function add_unit_price( $item_id, $item, $order ) {
 			$unit_price = OrderPriceFormatter::get_formatted_item_subtotal( $order, $item, get_option( 'woocommerce_tax_display_cart' ) );
@@ -275,6 +344,8 @@ if ( ! class_exists( 'WC_Email_Customer_POS_Completed_Order', false ) ) :
 		 * @param WC_Order $order      Order object.
 		 * @param string   $tax_display Tax display.
 		 * @return array Modified array of total rows.
+		 *
+		 * @internal For exclusive usage within this class, backwards compatibility not guaranteed.
 		 */
 		public function order_item_totals( $total_rows, $order, $tax_display ) {
 			$cash_payment_change_due_amount = $order->get_meta( '_cash_change_amount', true );
@@ -315,14 +386,17 @@ if ( ! class_exists( 'WC_Email_Customer_POS_Completed_Order', false ) ) :
 		}
 
 		/**
-		 * Add this email template to the list of valid templates for POS orders.
+		 * Add this email template to the list of valid templates for POS-paid orders.
 		 *
 		 * @param array    $valid_template_classes Array of valid template class names.
 		 * @param WC_Order $order                  The order.
 		 * @return array Modified array of valid template class names.
+		 *
+		 * @internal For exclusive usage within this class, backwards compatibility not guaranteed.
+		 * @since 10.6.0
 		 */
 		public function add_to_valid_template_classes( $valid_template_classes, $order ) {
-			if ( ! PointOfSaleOrderUtil::is_pos_order( $order ) ) {
+			if ( ! PointOfSaleOrderUtil::is_order_paid_at_pos( $order ) ) {
 				return $valid_template_classes;
 			}
 			$valid_template_classes[] = get_class( $this );
@@ -335,8 +409,9 @@ if ( ! class_exists( 'WC_Email_Customer_POS_Completed_Order', false ) ) :
 		 * @return string
 		 */
 		private function get_pos_store_name() {
+			$store_name = get_option( 'woocommerce_pos_store_name' );
 			return $this->format_string(
-				get_option( 'woocommerce_pos_store_name', PointOfSaleDefaultSettings::get_default_store_name() )
+				empty( $store_name ) ? PointOfSaleDefaultSettings::get_default_store_name() : $store_name
 			);
 		}
 
@@ -381,6 +456,36 @@ if ( ! class_exists( 'WC_Email_Customer_POS_Completed_Order', false ) ) :
 		private function get_pos_refund_returns_policy() {
 			return $this->format_string(
 				get_option( 'woocommerce_pos_refund_returns_policy' )
+			);
+		}
+
+		/**
+		 * Replace footer text placeholders with POS-specific values.
+		 *
+		 * @param string $footer_text The footer text to be filtered.
+		 * @param mixed  $email       Email object.
+		 * @return string Modified footer text.
+		 *
+		 * @internal For exclusive usage within this class, backwards compatibility not guaranteed.
+		 */
+		public function replace_footer_placeholders( $footer_text, $email ) {
+			// Only replace placeholders if we're in the context of a POS email.
+			if ( $email->id !== $this->id ) {
+				return $footer_text;
+			}
+
+			return str_replace(
+				array(
+					'{site_title}',
+					'{store_address}',
+					'{store_email}',
+				),
+				array(
+					$this->get_pos_store_name(),
+					$this->get_pos_store_address(),
+					$this->get_pos_store_email(),
+				),
+				$footer_text
 			);
 		}
 	}

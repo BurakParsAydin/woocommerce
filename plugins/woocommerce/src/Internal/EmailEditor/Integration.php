@@ -11,9 +11,8 @@ use Automattic\WooCommerce\Internal\EmailEditor\EmailPatterns\PatternsController
 use Automattic\WooCommerce\Internal\EmailEditor\EmailTemplates\TemplatesController;
 use Automattic\WooCommerce\Internal\EmailEditor\WCTransactionalEmails\WCTransactionalEmails;
 use Automattic\WooCommerce\Internal\EmailEditor\WCTransactionalEmails\WCTransactionalEmailPostsManager;
-use Automattic\WooCommerce\Internal\EmailEditor\TransactionalEmailPersonalizer;
 use Automattic\WooCommerce\Internal\EmailEditor\EmailTemplates\TemplateApiController;
-use Throwable;
+use Automattic\WooCommerce\EmailEditor\Engine\Logger\Email_Editor_Logger;
 use WP_Post;
 
 defined( 'ABSPATH' ) || exit;
@@ -53,6 +52,13 @@ class Integration {
 	private EmailApiController $email_api_controller;
 
 	/**
+	 * The WC_Email instance.
+	 *
+	 * @var \WC_Email
+	 */
+	private \WC_Email $wc_email_instance;
+
+	/**
 	 * Constructor.
 	 */
 	public function __construct() {
@@ -78,10 +84,22 @@ class Integration {
 	 * Initialize the integration.
 	 */
 	public function initialize() {
+		$this->init_logger();
 		$this->init_hooks();
 		$this->extend_post_api();
 		$this->extend_template_post_api();
 		$this->register_hooks();
+	}
+
+	/**
+	 * Initialize the logger.
+	 */
+	public function init_logger() {
+		$editor_container = Email_Editor_Container::container();
+		$logger           = $editor_container->get( Email_Editor_Logger::class );
+
+		// Register the WooCommerce logger with the email editor package.
+		$logger->set_logger( new Logger( wc_get_logger() ) );
 	}
 
 	/**
@@ -97,6 +115,15 @@ class Integration {
 		$this->editor_page_renderer    = $container->get( PageRenderer::class );
 		$this->template_api_controller = $container->get( TemplateApiController::class );
 		$this->email_api_controller    = $container->get( EmailApiController::class );
+
+		// Using any email class to get the instance.
+		$registered_emails = \WC_Emails::instance()->get_emails();
+		if ( isset( $registered_emails['WC_Email_New_Order'] ) ) {
+			$this->wc_email_instance = $registered_emails['WC_Email_New_Order'];
+		} else {
+			$first_email_key         = array_key_first( $registered_emails );
+			$this->wc_email_instance = $registered_emails[ $first_email_key ];
+		}
 	}
 
 	/**
@@ -107,9 +134,12 @@ class Integration {
 		add_filter( 'woocommerce_is_email_editor_page', array( $this, 'is_editor_page' ), 10, 1 );
 		add_filter( 'replace_editor', array( $this, 'replace_editor' ), 10, 2 );
 		add_action( 'before_delete_post', array( $this, 'delete_email_template_associated_with_email_editor_post' ), 10, 2 );
-		add_filter( 'woocommerce_email_editor_send_preview_email_rendered_data', array( $this, 'update_send_preview_email_rendered_data' ) );
+		add_filter( 'woocommerce_email_editor_send_preview_email_rendered_data', array( $this, 'update_send_preview_email_rendered_data' ), 10, 2 );
 		add_filter( 'woocommerce_email_editor_send_preview_email_personalizer_context', array( $this, 'update_send_preview_email_personalizer_context' ) );
 		add_filter( 'woocommerce_email_editor_preview_post_template_html', array( $this, 'update_preview_post_template_html_data' ), 100, 1 );
+		add_action( 'woocommerce_email_editor_send_preview_email_before_wp_mail', array( $this, 'send_preview_email_before_wp_mail' ), 10 );
+		add_action( 'woocommerce_email_editor_send_preview_email_after_wp_mail', array( $this, 'send_preview_email_after_wp_mail' ), 10 );
+		add_filter( 'woocommerce_email_editor_send_preview_email_subject', array( $this, 'update_email_subject_for_send_preview_email' ), 10, 2 );
 	}
 
 	/**
@@ -122,7 +152,7 @@ class Integration {
 		$post_types[] = array(
 			'name' => self::EMAIL_POST_TYPE,
 			'args' => array(
-				'labels'   => array(
+				'labels'          => array(
 					'name'          => __( 'Emails', 'woocommerce' ),
 					'singular_name' => __( 'Email', 'woocommerce' ),
 					'add_new_item'  => __( 'Add Email', 'woocommerce' ),
@@ -131,13 +161,27 @@ class Integration {
 					'view_item'     => __( 'View Email', 'woocommerce' ),
 					'search_items'  => __( 'Search Emails', 'woocommerce' ),
 				),
-				'rewrite'  => array( 'slug' => self::EMAIL_POST_TYPE ),
-				'supports' => array(
+				'rewrite'         => array( 'slug' => self::EMAIL_POST_TYPE ),
+				'supports'        => array(
 					'title',
 					'editor' => array(
 						'default-mode' => 'template-locked',
 					),
+					'excerpt',
 				),
+				'capability_type' => self::EMAIL_POST_TYPE,
+				'capabilities'    => array(
+					'edit_post'          => 'manage_woocommerce',
+					'read_post'          => 'manage_woocommerce',
+					'delete_post'        => 'manage_woocommerce',
+					'edit_posts'         => 'manage_woocommerce',
+					'edit_others_posts'  => 'manage_woocommerce',
+					'delete_posts'       => 'manage_woocommerce',
+					'publish_posts'      => 'manage_woocommerce',
+					'read_private_posts' => 'manage_woocommerce',
+					'create_posts'       => 'manage_woocommerce',
+				),
+				'map_meta_cap'    => false,
 			),
 		);
 		return $post_types;
@@ -192,7 +236,7 @@ class Integration {
 
 		$post_manager = WCTransactionalEmailPostsManager::get_instance();
 
-		$email_type = $post_manager->get_email_type_from_post_id( $post_id );
+		$email_type = $post_manager->get_email_type_from_post_id( $post_id, true );
 
 		if ( empty( $email_type ) ) {
 			return;
@@ -225,13 +269,16 @@ class Integration {
 	 *
 	 * @param string $data       The preview data.
 	 * @param string $email_type The email type identifier (e.g., 'customer_processing_order').
+	 * @param int    $post_id    The post ID.
 	 * @return string The updated preview data with placeholders replaced.
 	 */
-	private function update_email_preview_data( $data, string $email_type ) {
+	private function update_email_preview_data( $data, string $email_type, $post_id = 0 ) {
 		$type_param = EmailPreview::DEFAULT_EMAIL_TYPE;
 
-		if ( ! empty( $email_type ) ) {
-			$type_param = WCTransactionalEmailPostsManager::get_instance()->get_email_type_class_name_from_template_name( $email_type );
+		if ( ! empty( $post_id ) ) {
+			$type_param = WCTransactionalEmailPostsManager::get_instance()->get_email_type_class_name_from_post_id( $post_id );
+		} elseif ( ! empty( $email_type ) ) {
+			$type_param = WCTransactionalEmailPostsManager::get_instance()->get_email_type_class_name_from_email_id( $email_type );
 		}
 
 		$email_preview = wc_get_container()->get( EmailPreview::class );
@@ -255,10 +302,11 @@ class Integration {
 	/**
 	 * Filter email preview data used when sending a preview email.
 	 *
-	 * @param string $data The preview data.
+	 * @param string  $data The preview data.
+	 * @param WP_Post $post The post object.
 	 * @return string The updated preview data with placeholders replaced.
 	 */
-	public function update_send_preview_email_rendered_data( $data ) {
+	public function update_send_preview_email_rendered_data( $data, $post ) {
 		$email_type = '';
 		$post_body  = file_get_contents( 'php://input' );
 
@@ -273,6 +321,11 @@ class Integration {
 					return $this->update_email_preview_data( $data, $email_type );
 				}
 			}
+		} elseif ( ! empty( $post ) && $post instanceof \WP_Post ) {
+			$email_type = WCTransactionalEmailPostsManager::get_instance()->get_email_type_from_post_id( $post->ID );
+			if ( ! empty( $email_type ) ) {
+				return $this->update_email_preview_data( $data, $email_type, $post->ID );
+			}
 		}
 		return $data;
 	}
@@ -284,10 +337,10 @@ class Integration {
 	 * @return array The updated personalizer context.
 	 */
 	public function update_send_preview_email_personalizer_context( $context ) {
-		$post_manager             = WCTransactionalEmailPostsManager::get_instance();
-		$email_type_template_name = $post_manager->get_email_type_from_post_id( get_the_ID() );
-		$email_type               = $email_type_template_name ? $post_manager->get_email_type_class_name_from_template_name( $email_type_template_name ) : EmailPreview::DEFAULT_EMAIL_TYPE;
-		$email_preview            = wc_get_container()->get( EmailPreview::class );
+		$post_manager  = WCTransactionalEmailPostsManager::get_instance();
+		$email_id      = $post_manager->get_email_type_from_post_id( get_the_ID() );
+		$email_type    = $email_id ? $post_manager->get_email_type_class_name_from_email_id( $email_id ) : EmailPreview::DEFAULT_EMAIL_TYPE;
+		$email_preview = wc_get_container()->get( EmailPreview::class );
 
 		try {
 			$email_preview->set_email_type( $email_type );
@@ -310,12 +363,21 @@ class Integration {
 	 * @return string The updated preview HTML with placeholders replaced.
 	 */
 	public function update_preview_post_template_html_data( $data ) {
+		// return early if the data does not contain the placeholder meaning it's already been processed.
+		if ( ! str_contains( (string) $data, BlockEmailRenderer::WOO_EMAIL_CONTENT_PLACEHOLDER ) ) {
+			return $data;
+		}
+
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended
 		// Nonce verification is disabled here because the preview action doesn't modify data,
 		// and the check caused issues with the 'Preview in new tab' feature due to context changes.
 		$type_param = isset( $_GET['woo_email'] ) ? sanitize_text_field( wp_unslash( $_GET['woo_email'] ) ) : '';
+
+		// check for post id (preview id) in the request.
+		$post_id = isset( $_REQUEST['preview_id'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['preview_id'] ) ) : '';
+
 		// phpcs:enable
-		return $this->update_email_preview_data( $data, $type_param );
+		return $this->update_email_preview_data( $data, $type_param, $post_id );
 	}
 
 	/**
@@ -331,5 +393,64 @@ class Integration {
 				'schema'          => $this->email_api_controller->get_email_data_schema(),
 			)
 		);
+	}
+
+	/**
+	 * Action hook callback before sending the preview email via wp_mail
+	 *
+	 * @since 10.6.0
+	 * @return void
+	 */
+	public function send_preview_email_before_wp_mail() {
+		add_filter( 'wp_mail_from', array( $this->wc_email_instance, 'get_from_address' ) );
+		add_filter( 'wp_mail_from_name', array( $this->wc_email_instance, 'get_from_name' ) );
+	}
+
+	/**
+	 * Action hook callback after sending the preview email via wp_mail.
+	 *
+	 * @since 10.6.0
+	 * @return void
+	 */
+	public function send_preview_email_after_wp_mail() {
+		remove_filter( 'wp_mail_from', array( $this->wc_email_instance, 'get_from_address' ) );
+		remove_filter( 'wp_mail_from_name', array( $this->wc_email_instance, 'get_from_name' ) );
+	}
+
+	/**
+	 * Update the email subject for the send preview email.
+	 *
+	 * @param string  $subject The email subject.
+	 * @param WP_Post $post    The post object.
+	 * @return string The updated email subject.
+	 */
+	public function update_email_subject_for_send_preview_email( $subject, $post ) {
+		if ( ! $post instanceof \WP_Post || self::EMAIL_POST_TYPE !== $post->post_type ) {
+			return $subject;
+		}
+
+		$post_manager = WCTransactionalEmailPostsManager::get_instance();
+
+		$email_type_class_name = $post_manager->get_email_type_class_name_from_post_id( $post->ID );
+
+		if ( empty( $email_type_class_name ) ) {
+			return $subject;
+		}
+
+		/**
+		 * Validate the email type class name.
+		 *
+		 * @var EmailPreview $email_preview
+		 */
+		$email_preview = wc_get_container()->get( EmailPreview::class );
+
+		try {
+			$email_preview->set_email_type( $email_type_class_name );
+			return $email_preview->get_subject();
+		} catch ( \InvalidArgumentException $e ) {
+			return $subject;
+		} catch ( \Throwable $e ) {
+			return $subject;
+		}
 	}
 }

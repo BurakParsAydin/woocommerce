@@ -86,6 +86,14 @@ export interface ProductResponseItem {
 		class: string;
 	};
 	sold_individually: boolean;
+	weight: string;
+	dimensions: {
+		length: string;
+		width: string;
+		height: string;
+	};
+	formatted_weight: string;
+	formatted_dimensions: string;
 	add_to_cart: {
 		text: string;
 		description: string;
@@ -97,4 +105,7 @@ export interface ProductResponseItem {
 	};
 	slug: string;
 	grouped_products: Array< number >;
+	price: string;
+	regular_price: string;
+	sale_price: string;
 }

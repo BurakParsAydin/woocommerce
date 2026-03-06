@@ -3,6 +3,8 @@
 	flex-wrap: wrap;
 	width: 100%;
 	box-sizing: border-box;
+	align-items: center;
+	gap: $gap-smallest;
 }
 
 .wc-block-components-totals-item__label {
@@ -10,6 +12,6 @@
 }
 
 .wc-block-components-totals-item__description {
-	@include font-size(small);
+	@include font-x-small-locked;
 	width: 100%;
 }

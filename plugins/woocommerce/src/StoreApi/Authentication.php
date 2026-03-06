@@ -3,7 +3,7 @@ declare( strict_types=1 );
 namespace Automattic\WooCommerce\StoreApi;
 
 use Automattic\WooCommerce\StoreApi\Utilities\RateLimits;
-use Automattic\WooCommerce\StoreApi\Utilities\JsonWebToken;
+use Automattic\WooCommerce\StoreApi\Utilities\CartTokenUtils;
 use Automattic\WooCommerce\Utilities\FeaturesUtil;
 
 /**
@@ -38,6 +38,26 @@ class Authentication {
 		$allowed_headers[] = 'Cart-Token';
 		$allowed_headers[] = 'Nonce';
 		return $allowed_headers;
+	}
+
+	/**
+	 * Use the Store API session handler when a valid Cart-Token is present.
+	 *
+	 * @since 10.6.0
+	 * @param string $handler Session handler class name.
+	 * @return string
+	 */
+	public function maybe_use_store_api_session_handler( $handler ): string {
+		if ( ! WC()->is_store_api_request() && ! $this->has_store_api_route_as_get_parameter() ) {
+			return $handler;
+		}
+
+		$cart_token = wc_clean( wp_unslash( $_SERVER['HTTP_CART_TOKEN'] ?? '' ) );
+		$cart_token = is_string( $cart_token ) ? $cart_token : '';
+		if ( $cart_token && CartTokenUtils::validate_cart_token( $cart_token ) ) {
+			return SessionHandler::class;
+		}
+		return $handler;
 	}
 
 	/**
@@ -83,7 +103,7 @@ class Authentication {
 
 		// Allow preflight requests, certain http origins, and any origin if a cart token is present. Preflight requests
 		// are allowed because we'll be unable to validate cart token headers at that point.
-		if ( $this->is_preflight() || JsonWebToken::validate( $this->get_cart_token( $request ), $this->get_cart_token_secret() ) || is_allowed_http_origin( $origin ) ) {
+		if ( $this->is_preflight() || CartTokenUtils::validate_cart_token( $this->get_cart_token( $request ) ) || is_allowed_http_origin( $origin ) ) {
 			$server->send_header( 'Access-Control-Allow-Origin', $origin );
 		}
 
@@ -94,6 +114,23 @@ class Authentication {
 		}
 
 		return $served;
+	}
+
+	/**
+	 * Checks if the request has a store API route as a GET `rest_route` parameter.
+	 *
+	 * @since 10.6.0
+	 * @return bool
+	 */
+	protected function has_store_api_route_as_get_parameter(): bool {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Store API
+		if ( ! isset( $_GET['rest_route'] ) || ! is_string( $_GET['rest_route'] ) ) {
+			return false;
+		}
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Store API context check.
+		$rest_route = rawurldecode( esc_url_raw( wp_unslash( $_GET['rest_route'] ) ) );
+		return 0 === strpos( $rest_route, '/wc/store/' );
 	}
 
 	/**
@@ -113,15 +150,6 @@ class Authentication {
 	 */
 	protected function get_cart_token( \WP_REST_Request $request ) {
 		return wc_clean( wp_unslash( $request->get_header( 'Cart-Token' ) ?? '' ) );
-	}
-
-	/**
-	 * Gets the secret for the cart token using wp_salt.
-	 *
-	 * @return string
-	 */
-	protected function get_cart_token_secret() {
-		return '@' . wp_salt();
 	}
 
 	/**
@@ -164,8 +192,7 @@ class Authentication {
 			FeaturesUtil::feature_is_enabled( 'rate_limit_checkout' )
 			&& $this->is_request_to_store_api()
 			&& preg_match( '#/wc/store(?:/v\d+)?/checkout#', $GLOBALS['wp']->query_vars['rest_route'] )
-			&& isset( $_SERVER['REQUEST_METHOD'] )
-			&& 'POST' === $_SERVER['REQUEST_METHOD']
+			&& $this->is_only_post_request()
 		) {
 			add_filter(
 				'woocommerce_store_api_rate_limit_options',
@@ -272,6 +299,31 @@ class Authentication {
 			return false;
 		}
 		return 0 === strpos( $GLOBALS['wp']->query_vars['rest_route'], '/wc/store/' );
+	}
+
+	/**
+	 * Returns true only for POST requests that are NOT overridden to another method
+	 * via the X-HTTP-Method-Override header (used by wp.apiFetch for PUT/DELETE).
+	 *
+	 * @see https://github.com/wordpress/gutenberg/blob/trunk/packages/api-fetch/src/middlewares/http-v1.ts#L21-L43
+	 *
+	 * @return bool
+	 */
+	private function is_only_post_request() {
+		// Check that REQUEST_METHOD is POST.
+		if ( ! isset( $_SERVER['REQUEST_METHOD'] ) || 'POST' !== $_SERVER['REQUEST_METHOD'] ) {
+			return false;
+		}
+
+		// Check X-HTTP-Method-Override header if it exists and is not empty - it must also be POST.
+		if ( isset( $_SERVER['HTTP_X_HTTP_METHOD_OVERRIDE'] ) ) {
+			$method_override = strtoupper( sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_HTTP_METHOD_OVERRIDE'] ) ) );
+			if ( '' !== $method_override && 'POST' !== $method_override ) {
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	/**

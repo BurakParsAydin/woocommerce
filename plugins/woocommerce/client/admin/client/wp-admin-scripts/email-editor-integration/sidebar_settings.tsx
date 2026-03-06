@@ -8,11 +8,18 @@ import {
 	PanelRow,
 	TextControl,
 	ToggleControl,
+	__experimentalText as Text,
 } from '@wordpress/components';
 import { addFilter } from '@wordpress/hooks';
 import { __ } from '@wordpress/i18n';
 import clsx from 'clsx';
 import { useState } from '@wordpress/element';
+import {
+	EmailActionsFill,
+	TemplateSelection,
+	recordEvent as emailEditorRecordEvent,
+} from '@woocommerce/email-editor';
+import { registerPlugin } from '@wordpress/plugins';
 
 /**
  * Internal dependencies
@@ -23,8 +30,27 @@ import { EmailStatus } from './email-status';
 const previewTextMaxLength = 150;
 const previewTextRecommendedLength = 80;
 
-// @ts-expect-error RichTextWithButton has default any type and is not exported yet.
-const SidebarSettings = ( { RichTextWithButton } ) => {
+type SidebarSettings = {
+	RichTextWithButton: React.ComponentType< {
+		attributeName: string;
+		attributeValue: string;
+		updateProperty: ( name: string, value: string | boolean ) => void;
+		label: string;
+		placeholder: string;
+		help?: React.ReactNode;
+	} >;
+	recordEvent: ( name: string, data?: Record< string, unknown > ) => void;
+	debouncedRecordEvent: (
+		name: string,
+		data?: Record< string, unknown >
+	) => void;
+};
+
+const SidebarSettings = ( {
+	RichTextWithButton,
+	recordEvent,
+	debouncedRecordEvent,
+}: SidebarSettings ) => {
 	const [ woocommerce_email_data ] = useEntityProp(
 		'postType',
 		'woo_email',
@@ -34,6 +60,10 @@ const SidebarSettings = ( { RichTextWithButton } ) => {
 	// Initialize toggle control state
 	const [ addBCC, setAddBCC ] = useState( !! woocommerce_email_data?.bcc );
 	const [ addCC, setAddCC ] = useState( !! woocommerce_email_data?.cc );
+
+	if ( ! woocommerce_email_data ) {
+		return null;
+	}
 
 	const updateWooMailProperty = ( name: string, value: string | boolean ) => {
 		const editedPost = select( coreDataStore ).getEditedEntityRecord(
@@ -58,6 +88,24 @@ const SidebarSettings = ( { RichTextWithButton } ) => {
 	};
 
 	const previewTextLength = woocommerce_email_data?.preheader?.length ?? 0;
+
+	if (
+		woocommerce_email_data.email_type ===
+		'customer_partially_refunded_order'
+	) {
+		return (
+			<>
+				<br />
+				<Text>
+					{ __(
+						'Update this email configuration in the "Order refunded" email.',
+						'woocommerce'
+					) }
+				</Text>
+				<br />
+			</>
+		);
+	}
 
 	return (
 		<>
@@ -138,6 +186,7 @@ const SidebarSettings = ( { RichTextWithButton } ) => {
 							__nextHasNoMarginBottom
 							__next40pxDefaultSize
 							name="recipient"
+							data-testid="email_recipient"
 							value={ woocommerce_email_data.recipient }
 							onChange={ ( value ) => {
 								updateWooMailProperty( 'recipient', value );
@@ -162,6 +211,9 @@ const SidebarSettings = ( { RichTextWithButton } ) => {
 							if ( ! value ) {
 								updateWooMailProperty( 'cc', '' );
 							}
+							recordEvent( 'email_cc_toggle_clicked', {
+								isEnabled: value,
+							} );
 						} }
 					/>
 				</BaseControl>
@@ -172,9 +224,16 @@ const SidebarSettings = ( { RichTextWithButton } ) => {
 						<TextControl
 							__nextHasNoMarginBottom
 							__next40pxDefaultSize
+							data-testid="email_cc"
 							value={ woocommerce_email_data?.cc || '' }
 							onChange={ ( value ) => {
 								updateWooMailProperty( 'cc', value );
+								debouncedRecordEvent(
+									'email_cc_input_updated',
+									{
+										value,
+									}
+								);
 							} }
 							help={ __(
 								'Add recipients who will receive a copy of the email. Separate multiple addresses with commas.',
@@ -196,6 +255,9 @@ const SidebarSettings = ( { RichTextWithButton } ) => {
 							if ( ! value ) {
 								updateWooMailProperty( 'bcc', '' );
 							}
+							recordEvent( 'email_bcc_toggle_clicked', {
+								isEnabled: value,
+							} );
 						} }
 					/>
 				</BaseControl>
@@ -206,9 +268,16 @@ const SidebarSettings = ( { RichTextWithButton } ) => {
 						<TextControl
 							__nextHasNoMarginBottom
 							__next40pxDefaultSize
+							data-testid="email_bcc"
 							value={ woocommerce_email_data?.bcc || '' }
 							onChange={ ( value ) => {
 								updateWooMailProperty( 'bcc', value );
+								debouncedRecordEvent(
+									'email_bcc_input_updated',
+									{
+										value,
+									}
+								);
 							} }
 							help={ __(
 								'Add recipients who will receive a hidden copy of the email. Separate multiple addresses with commas.',
@@ -223,17 +292,34 @@ const SidebarSettings = ( { RichTextWithButton } ) => {
 };
 
 export function modifySidebar() {
-	addFilter(
-		'woocommerce_email_editor_setting_sidebar_email_status_component',
-		NAME_SPACE,
-		() => EmailStatus
-	);
+	registerPlugin( 'woocommerce-email-editor-email-status', {
+		scope: 'woocommerce-email-editor',
+		render: () => (
+			<EmailActionsFill>
+				<EmailStatus recordEvent={ emailEditorRecordEvent } />
+			</EmailActionsFill>
+		),
+	} );
+
+	registerPlugin( 'woocommerce-email-editor-template-selection', {
+		scope: 'woocommerce-email-editor',
+		render: () => (
+			<EmailActionsFill>
+				<TemplateSelection />
+			</EmailActionsFill>
+		),
+	} );
+
 	addFilter(
 		'woocommerce_email_editor_setting_sidebar_extension_component',
 		NAME_SPACE,
-		( RichTextWithButton ) => {
+		( RichTextWithButton, tracking ) => {
 			return () => (
-				<SidebarSettings RichTextWithButton={ RichTextWithButton } />
+				<SidebarSettings
+					RichTextWithButton={ RichTextWithButton }
+					recordEvent={ tracking.recordEvent }
+					debouncedRecordEvent={ tracking.debouncedRecordEvent }
+				/>
 			);
 		}
 	);

@@ -18,6 +18,12 @@ use Automattic\WooCommerce\EmailEditor\Engine\PersonalizationTags\Personalizatio
 class Personalizer {
 
 	/**
+	 * Regex pattern for matching personalization tag names (e.g., "woocommerce/store-url", "user-firstname").
+	 * Used in both tag detection and parsing.
+	 */
+	private const TAG_NAME_PATTERN = '[a-zA-Z0-9\-\/]+';
+
+	/**
 	 * Personalization tags registry.
 	 *
 	 * @var Personalization_Tags_Registry
@@ -92,8 +98,9 @@ class Personalizer {
 		$content_processor = new HTML_Tag_Processor( $content );
 		while ( $content_processor->next_token() ) {
 			if ( $content_processor->get_token_type() === '#comment' ) {
-				$token = $this->parse_token( $content_processor->get_modifiable_text() );
-				$tag   = $this->tags_registry->get_by_token( $token['token'] );
+				$modifiable_text = $content_processor->get_modifiable_text();
+				$token           = $this->parse_token( $modifiable_text );
+				$tag             = $this->tags_registry->get_by_token( $token['token'] );
 				if ( ! $tag ) {
 					continue;
 				}
@@ -103,12 +110,13 @@ class Personalizer {
 
 			} elseif ( $content_processor->get_token_type() === '#tag' && $content_processor->get_tag() === 'TITLE' ) {
 				// The title tag contains the subject of the email which should be personalized. HTML_Tag_Processor does parse the header tags.
-				$title = $this->personalize_content( $content_processor->get_modifiable_text() );
+				$modifiable_text = $content_processor->get_modifiable_text();
+				$title           = $this->personalize_content( $modifiable_text );
 				$content_processor->set_modifiable_text( $title );
 
 			} elseif ( $content_processor->get_token_type() === '#tag' && $content_processor->get_tag() === 'A' && $content_processor->get_attribute( 'data-link-href' ) ) {
 				// The anchor tag contains the data-link-href attribute which should be personalized.
-				$href  = $content_processor->get_attribute( 'data-link-href' );
+				$href  = (string) $content_processor->get_attribute( 'data-link-href' );
 				$token = $this->parse_token( $href );
 				$tag   = $this->tags_registry->get_by_token( $token['token'] );
 				if ( ! $tag ) {
@@ -124,8 +132,13 @@ class Personalizer {
 				}
 			} elseif ( $content_processor->get_token_type() === '#tag' && $content_processor->get_tag() === 'A' ) {
 				$href = $content_processor->get_attribute( 'href' );
+				if ( ! is_string( $href ) ) {
+					continue;
+				}
 
-				if ( ! $href || ! preg_match( '/\[[a-z-\/]+\]/', urldecode( $href ), $matches ) ) {
+				// Decode both URL encoding (%XX) and HTML entities (&#039;) to handle various encoding scenarios.
+				$decoded_href = html_entity_decode( urldecode( $href ), ENT_QUOTES, 'UTF-8' );
+				if ( ! preg_match( '/\[' . self::TAG_NAME_PATTERN . '(?:\s+[^\]]+)?\]/', $decoded_href, $matches ) ) {
 					continue;
 				}
 
@@ -152,7 +165,7 @@ class Personalizer {
 	 * Parse a personalization tag to the token and attributes.
 	 *
 	 * @param string $token The token to parse.
-	 * @return array{token: string, arguments: array} The parsed token.
+	 * @return array{token: string, arguments: array<string, string>} The parsed token.
 	 */
 	private function parse_token( string $token ): array {
 		$result = array(
@@ -161,14 +174,33 @@ class Personalizer {
 		);
 
 		// Step 1: Separate the tag and attributes.
-		if ( preg_match( '/^\[([a-zA-Z0-9\-\/]+)\s*(.*?)\]$/', trim( $token ), $matches ) ) {
+		if ( preg_match( '/^\[(' . self::TAG_NAME_PATTERN . ')\s*(.*?)\]$/', trim( $token ), $matches ) ) {
 			$result['token']   = "[{$matches[1]}]"; // The tag part (e.g., "[mailpoet/subscriber-firstname]").
 			$attributes_string = $matches[2]; // The attributes part (e.g., 'default="subscriber"').
 
 			// Step 2: Extract attributes from the attribute string.
-			if ( preg_match_all( '/(\w+)=["\']([^"\']+)["\']/', $attributes_string, $attribute_matches, PREG_SET_ORDER ) ) {
+			// Match quoted values (double or single quotes separately to avoid mixing) and unquoted values.
+			// Unquoted values can occur when esc_url() strips quotes from personalization tags.
+			// For unquoted values with spaces, capture until the next key= pattern or closing bracket.
+			// The negative lookahead (?!\w+=) is critical for preventing ReDoS:
+			// it ensures the inner loop terminates as soon as the next key= pattern appears,
+			// preventing excessive backtracking despite the nested quantifiers.
+			if ( preg_match_all( '/(\w+)=(?:"([^"]*)"|\'([^\']*)\'|([^\s\]]+(?:\s+(?!\w+=)[^\s\]]+)*))/', $attributes_string, $attribute_matches, PREG_SET_ORDER ) ) {
 				foreach ( $attribute_matches as $attribute ) {
-					$result['arguments'][ $attribute[1] ] = $attribute[2];
+					// $attribute[2] is double-quoted value, $attribute[3] is single-quoted value,
+					// $attribute[4] is unquoted value (may contain spaces).
+					// Use null coalescing as only one of these will be populated depending on which pattern matched.
+					$double_quoted_value = $attribute[2] ?? '';
+					$single_quoted_value = $attribute[3] ?? '';
+					$unquoted_value      = $attribute[4] ?? '';
+
+					if ( '' !== $double_quoted_value ) {
+						$result['arguments'][ $attribute[1] ] = $double_quoted_value;
+					} elseif ( '' !== $single_quoted_value ) {
+						$result['arguments'][ $attribute[1] ] = $single_quoted_value;
+					} else {
+						$result['arguments'][ $attribute[1] ] = $unquoted_value;
+					}
 				}
 			}
 		}

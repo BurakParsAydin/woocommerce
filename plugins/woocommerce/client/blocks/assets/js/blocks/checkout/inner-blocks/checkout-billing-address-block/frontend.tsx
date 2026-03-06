@@ -40,13 +40,7 @@ const FrontendBlock = ( {
 	const { showBillingFields, forcedBillingAddress, useBillingAsShipping } =
 		useCheckoutAddress();
 
-	const { shippingRates } = useShippingData();
-
-	const hasSelectedLocalPickup = shippingRates.some( ( pkg ) =>
-		pkg.shipping_rates.some(
-			( rate ) => rate.method_id === 'pickup_location' && rate.selected
-		)
-	);
+	const { hasSelectedLocalPickup } = useShippingData();
 
 	if ( ! showBillingFields && ! useBillingAsShipping ) {
 		return null;
